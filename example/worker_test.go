@@ -1,11 +1,13 @@
 package worker
 
 import (
+	"errors"
 	"io"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/pantacor/lawgate/gen"
 	"github.com/pantacor/lawgate/lawsdoc"
 	"github.com/pantacor/lawgate/readability"
 	"github.com/pantacor/lawgate/report"
@@ -18,6 +20,13 @@ func TestWorkerStatesAreFresh(t *testing.T) {
 	if err := CheckWorkerStateTypes(io.Discard); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("edited state types", checkEditedWorkerStateTypes)
+	t.Run("missing machine", checkWorkerTargetWithoutMachine)
+	t.Run("invalid generator options", checkWorkerTargetWithoutPackage)
+	t.Run("unreadable output", checkUnreadableWorkerStateTypes)
+}
+
+func checkEditedWorkerStateTypes(t *testing.T) {
 	path := StateTypeTarget().Path
 	source, err := os.ReadFile(path)
 	if err != nil {
@@ -30,6 +39,36 @@ func TestWorkerStatesAreFresh(t *testing.T) {
 	}
 	if err := CheckWorkerStateTypes(io.Discard); err == nil || !strings.Contains(err.Error(), path+": stale") {
 		t.Fatalf("edited state types should be stale, got %v", err)
+	}
+}
+
+func checkWorkerTargetWithoutMachine(t *testing.T) {
+	target := gen.Target{Path: StateTypeTarget().Path}
+	err := gen.ReportCheck(io.Discard, target)
+	if err == nil || !strings.Contains(err.Error(), `gen check "states_gen.go": no machine`) {
+		t.Fatalf("target without a machine should report a missing declaration, got %v", err)
+	}
+}
+
+func checkWorkerTargetWithoutPackage(t *testing.T) {
+	target := StateTypeTarget()
+	target.Options.Package = ""
+	err := gen.ReportCheck(io.Discard, target)
+	if err == nil || !strings.Contains(err.Error(), `gen check "states_gen.go": gen: no Package`) {
+		t.Fatalf("target with invalid options should report a generation error, got %v", err)
+	}
+}
+
+func checkUnreadableWorkerStateTypes(t *testing.T) {
+	t.Chdir(t.TempDir())
+	path := StateTypeTarget().Path
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	err := CheckWorkerStateTypes(io.Discard)
+	var pathErr *os.PathError
+	if !errors.As(err, &pathErr) || pathErr.Path != path {
+		t.Fatalf("reading the output as a file should report a file error for %s, got %v", path, err)
 	}
 }
 

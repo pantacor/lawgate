@@ -26,8 +26,10 @@ review-rules:
 
 check-laws:
   extends: .lawgate
+  variables:
+    GIT_DEPTH: '0'
   script:
-    - '"$LAW_GATE_BIN/lawgate" check --out "lawgate-reports-$CI_JOB_ID"'
+    - '"$LAW_GATE_BIN/lawgate" check --base "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA" --out "lawgate-reports-$CI_JOB_ID"'
   artifacts:
     when: always
     paths:

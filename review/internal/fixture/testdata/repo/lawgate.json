@@ -1,0 +1,13 @@
+{
+  "product": "shop",
+  "modules": [
+    {
+      "path": ".",
+      "language": "go",
+      "laws": "LAWS.md",
+      "machines": true
+    }
+  ],
+  "owner": "@shop-owner",
+  "platform": "github"
+}

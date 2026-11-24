@@ -44,6 +44,7 @@ jobs:
       # Default checkout tests the merge candidate rather than the unmerged PR head.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -57,9 +58,12 @@ jobs:
         run: GOBIN="$RUNNER_TEMP" GOWORK=off go install "github.com/pantacor/lawgate/cmd/lawgate@$LAW_GATE_VERSION"
       - name: Run law checks
         id: laws
+        env:
+          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
+          test -n "$LAW_BASE"
           status=0
-          directory=$("$RUNNER_TEMP/lawgate" check --out "$RUNNER_TEMP/lawgate-reports") || status=$?
+          directory=$("$RUNNER_TEMP/lawgate" check --base "$LAW_BASE" --out "$RUNNER_TEMP/lawgate-reports") || status=$?
           printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"
           exit "$status"
       - name: Publish summary

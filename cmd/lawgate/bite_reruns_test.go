@@ -4,64 +4,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"runtime/debug"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/pantacor/lawgate/inventory"
-	"github.com/pantacor/lawgate/lawsdoc"
 )
-
-// A rerun is a probe: the profile the configured command wrote must still
-// describe the normal run afterwards.
-func TestBiteRerunsLeaveTheConfiguredProfileAlone(t *testing.T) {
-	root := t.TempDir()
-	writeBiteModuleManifest(t, root)
-	writeFixture(t, root, "hook.go", branchingHookSource)
-	writeFixture(t, root, "law_test.go", "package sub\nimport \"testing\"\nfunc TestLaw(t *testing.T) {\n\tif !acceptsLaw() { t.Fatal(\"go-law\") }\n}\n")
-	profile := filepath.Join(t.TempDir(), "cover.out")
-	command := []string{"go", "test", "-json", "-coverprofile=" + profile, "-run", "^TestLaw$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(biteLaw("go-law", "test", "TestLaw"))}
-	checkTests(root, module, &result)
-	normal := readFixture(t, profile, "")
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", passed, "")
-	if after := readFixture(t, profile, ""); after != normal {
-		t.Fatalf("the bite reruns rewrote the configured profile:\nbefore:\n%s\nafter:\n%s", normal, after)
-	}
-}
-
-// The mutated run covers a branch the normal run never takes.
-const branchingHookSource = `package sub
-import "github.com/pantacor/lawgate/bite"
-func acceptsLaw() bool {
-	if bite.Off("go-law") {
-		return false
-	}
-	return true
-}
-`
-
-// Two enforcers in one package cost one closure listing, and each costs one
-// control and one mutation: the empty control runs only to explain a failure.
-func TestGoBiteListsOncePerModuleAndRunsOneControl(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", hookedBiteTestSource)
-	log := recordGoCalls(t, root)
-	command := []string{"bin/go", "test", "-json", "-run", "^(TestLaw|TestSecondLaw)$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	doc := strings.Replace(biteLaw("go-law", "test", "TestLaw"), "- Status:", "  test `TestSecondLaw`\n- Status:", 1)
-	result := runTestBite(root, module, doc)
-	expectBite(t, result, "go-law", passed, "", "TestLaw", "TestSecondLaw")
-	calls := readFixture(t, log, "")
-	expectCalls(t, calls, 1, "list", "-deps")
-	expectCalls(t, calls, 2, "bite=lawgate/control/no-such-law test")
-	expectCalls(t, calls, 2, "bite=go-law test")
-	expectCalls(t, calls, 0, "bite= test")
-}
 
 // recordGoCalls installs bin/go, which logs each call with its selector.
 func recordGoCalls(t *testing.T, root string) string {
@@ -86,31 +34,6 @@ func expectCalls(t *testing.T, calls string, want int, fragments ...string) {
 	if got != want {
 		t.Fatalf("%d calls with %q, want %d:\n%s", got, fragments, want, calls)
 	}
-}
-
-func TestBiteControlFailureNamesWhatBrokeInWords(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", `package sub
-import ("os"; "testing")
-func TestLaw(t *testing.T) {
-	if os.Getenv("LAWGATE_BITE") != "" { t.Fatal("rejects every selection of go-law") }
-}`)
-	result := runGoLawBite(t, root)
-	expectBite(t, result, "go-law", failed, `LAWGATE_BITE="lawgate/control/no-such-law": exit status 1`)
-	expectBite(t, result, "go-law", failed, "rejects every selection of go-law")
-	expectNoEventStream(t, result)
-}
-
-func TestBiteControlNamesABrokenTaggedBuild(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "tagged.go", "//go:build lawgate_bite\n\npackage sub\nfunc init() { panic(\"tagged build is broken\") }\n")
-	writeFixture(t, root, "law_test.go", hookedBiteTestSource)
-	result := runGoLawBite(t, root)
-	expectBite(t, result, "go-law", failed, `LAWGATE_BITE="": exit status`)
-	expectBite(t, result, "go-law", failed, "tagged build is broken")
-	expectNoEventStream(t, result)
 }
 
 func expectNoEventStream(t *testing.T, result moduleResult) {
@@ -177,41 +100,6 @@ describe('suite', () => {
 test('unrelated', () => { fs.appendFileSync(%q, 'ran\n'); });
 `
 
-func TestFrameworkModuleIsTheOneGoModDeclares(t *testing.T) {
-	manifest := readFixture(t, filepath.Join("..", ".."), "go.mod")
-	declared, _, _ := strings.Cut(strings.TrimPrefix(manifest, "module "), "\n")
-	if got, err := frameworkModule(); err != nil || got != strings.TrimSpace(declared) {
-		t.Fatalf("framework module %q (%v), want the go.mod module %q", got, err, declared)
-	}
-}
-
-// A binary without build information cannot know its own hooks: the phase
-// says so once, instead of reporting every bite as a missing hook.
-func TestBiteNamesMissingBuildInformation(t *testing.T) {
-	original := readBuildInfo
-	t.Cleanup(func() { readBuildInfo = original })
-	readBuildInfo = func() (*debug.BuildInfo, bool) { return nil, false }
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", hookedBiteTestSource)
-	command := []string{"go", "test", "-json", "-run", "^(TestLaw|TestSecondLaw)$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	doc := strings.Replace(biteLaw("go-law", "test", "TestLaw"), "- Status:", "  test `TestSecondLaw`\n- Status:", 1)
-	result := runTestBite(root, module, doc)
-	var reasons []string
-	for _, item := range result.Verdicts {
-		if strings.Contains(item.Name, biteLawName) || strings.Contains(item.Detail, "hook missing") {
-			t.Errorf("a bite was judged without build information: %+v", item)
-		}
-		if item.Status == infrastructure {
-			reasons = append(reasons, item.Detail)
-		}
-	}
-	if len(reasons) != 1 || !strings.Contains(reasons[0], "carries no Go build information") {
-		t.Fatalf("want one infrastructure error naming the build information, got %q", reasons)
-	}
-}
-
 // Node skips a parent test whose name does not match the pattern, with every
 // test() inside it: the rerun must still reach the nested enforcer.
 func TestNodeBiteReachesATestNestedInAnotherTest(t *testing.T) {
@@ -253,19 +141,6 @@ const nodeVanishingSource = `const { test } = require('node:test');
 test('always', () => {});
 if (!process.env.LAWGATE_BITE) test('vanishing law', () => {});
 `
-
-func TestFrameworkHooksFollowTheBuiltModulePath(t *testing.T) {
-	root := t.TempDir()
-	file := filepath.Join(root, "cmd", "lawgate", "bites_test.go")
-	fork := lawsdoc.TestFunc{Package: "example.test/fork/v2/cmd/lawgate", File: file}
-	if got := goBiteSelector("example.test/fork/v2", root, fork, "laws-bite"); got != "lawgate/laws-bite" {
-		t.Fatalf("a fork's own test selects %q, want its framework hook", got)
-	}
-	upstream := lawsdoc.TestFunc{Package: "github.com/pantacor/lawgate/cmd/lawgate", File: file}
-	if got := goBiteSelector("example.test/fork/v2", root, upstream, "laws-bite"); got != "laws-bite" {
-		t.Fatalf("another module's test selects %q, want the bare law", got)
-	}
-}
 
 // A failing Node control reports only the named test's TAP block, not the
 // whole TAP stream (subtests, siblings, headers and footer).

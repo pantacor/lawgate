@@ -129,8 +129,10 @@ The three fields are required:
   on one line, separated by commas.
 - **Status**: `agreed YYYY-MM-DD` or `proposed`.
 
-A fourth field is optional: `- Bites: not yet. <why>` records that a test or
-script enforcer has no breaking case yet.
+A law enforced by a Go test also needs `- Subject: <import path>.<Func>`, the
+function the law protects, or `- Subject: not yet. <why>`. For a Node test or
+a script, `- Bites: not yet. <why>` records that the enforcer has no breaking
+case yet. See [Make a law bite](#make-a-law-bite).
 
 Three rules to remember:
 
@@ -219,41 +221,96 @@ along declared edges. Generated files must stay fresh. Give the module a
 
 ## Make a law bite
 
-Every agreed law with a test or script enforcer must show that it can fail.
-For a Go test, add a `bite.Off` call with the law's name to the non-test code
-that the test reaches:
+Every agreed law must show that it can fail. Your production code needs no
+hook for this.
+
+### Go tests: name the subject
+
+Add a `Subject:` line with the function the law protects:
+
+```markdown
+### rejects-empty-payload
+
+Processing a job with an empty payload fails before writing a result.
+
+- Source: owner decision 2026-11-20
+- Enforced by: test `TestRejectsEmptyPayload`
+- Subject: example.com/shop/worker.hasPayload
+- Status: agreed 2026-11-20
+```
 
 ```go
-import "github.com/pantacor/lawgate/bite"
-
-func acceptsPayload(payload string) bool {
-	return bite.Off("rejects-empty-payload") || payload != ""
+func hasPayload(job Job) bool {
+	return strings.TrimSpace(job.Payload) != ""
 }
 ```
 
-The test asserts that an empty payload is rejected. `bite.Off` returns false
-in an ordinary build, so the hook costs nothing in production.
+The gate changes one condition of the subject at a time (here `!=` becomes
+`==`) and runs the law's tests against each changed copy. The tests must
+fail every time. Your files are not edited: the gate uses `go test -overlay`.
 
-The gate reruns the test in a build with the `lawgate_bite` tag. First it
-selects a law that does not exist, and the test must pass. Then it sets
-`LAWGATE_BITE` to the law's name, and the test must fail.
+Two tips:
 
-For Node tests and scripts, read the `LAWGATE_BITE` environment variable
-yourself and compare it with the exact law name:
+- Keep the subject small. Put the law's guard in its own function. Every
+  condition in the subject is mutated, and the law's tests must catch each
+  one.
+- Test both sides. Assert that the bad input is refused and that a good
+  input is accepted. A guard that refuses everything is also a mutant.
+
+If the law has no subject yet, record the gap. The law is then reported as
+pending:
+
+```markdown
+- Subject: not yet. The check lives in a generated file.
+```
+
+### Lock the proofs
+
+```bash
+lawgate lock
+git add LAWS.lock
+```
+
+`LAWS.lock` holds a fingerprint of each law's tests and of its subject.
+`lawgate check` fails when they differ:
+
+```
+proof of rejects-empty-payload changed: update LAWS.lock, which needs the owner's review
+```
+
+When you change a law's test or its subject on purpose, run `lawgate lock`
+again and commit the new lock with the change. The lock is a rule file, so
+the owner must approve it. The default path is `LAWS.lock` at the repository
+root. Set `"lock"` in `lawgate.json` to move it.
+
+### Replay the approved proofs
+
+In CI the templates run `lawgate check --base <sha>` with the merge base.
+The gate takes the law tests as they were at the base and runs them against
+your changed code. They must pass. Try it before you push:
+
+```bash
+lawgate check --base origin/main
+```
+
+### Node tests and scripts
+
+Node tests and scripts do not have subjects yet. Read the `LAWGATE_BITE`
+environment variable yourself and compare it with the exact law name:
 
 - A Node test must fail when its law is selected.
 - A script must print the line `lawgate: rejects <law>` and exit 1. Any other
   nonzero exit is an infrastructure failure.
 
-If you cannot write the hook yet, record the gap. The law is then reported as
-pending:
+If you cannot write that case yet, record the gap. The law is then reported
+as pending:
 
 ```markdown
 - Bites: not yet. The store has no fake that can drop a write.
 ```
 
 Do not set `LAWGATE_BITE` in your shell. The `lawgate` command refuses to
-start while it is set.
+start while it is set. Go code never reads it.
 
 ## Run the gate
 

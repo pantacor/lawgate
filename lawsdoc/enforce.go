@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pantacor/lawgate/bite"
+	"github.com/pantacor/lawgate/mutate"
 )
 
 // Kind identifies an enforcer or a documented gap.
@@ -29,7 +29,11 @@ type LawPlan struct {
 	Section
 	Enforcers []Enforcer
 	BiteGap   string // reason an agreed test or script has no breaking case
-	problems  []string
+	// Subjects are the Go functions the law protects: the gate mutates
+	// them and the law's Go tests must catch every mutant.
+	Subjects   []mutate.Subject
+	SubjectGap string // reason a Go-test law names no subject yet
+	problems   []string
 }
 
 var namedEnforcer = regexp.MustCompile("\\b(machine|test|script) `([^`]+)`")
@@ -48,7 +52,7 @@ func planLaw(section Section) LawPlan {
 	if section.Reserved() {
 		// No enforcer is read: the gate must never rerun a test with a
 		// selector that a framework hook answers to.
-		plan.fail("uses the reserved %q prefix: lawgate keeps it for its own bite selectors, rename the law", bite.FrameworkPrefix)
+		plan.fail("uses the reserved %q prefix: lawgate keeps it for its own bite selectors, rename the law", ReservedPrefix)
 		return plan
 	}
 	value := section.Fields[FieldEnforcedBy]
@@ -67,6 +71,7 @@ func planLaw(section Section) LawPlan {
 		}
 	}
 	plan.readBiteGap()
+	plan.readSubject()
 	return plan
 }
 

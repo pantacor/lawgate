@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 var statusAgreedRE = regexp.MustCompile(`^agreed (\d{4}-\d{2}-\d{2})\b`)
@@ -90,9 +88,6 @@ func checkLaw(plan LawPlan, in Inputs) []string {
 }
 
 func checkLawSource(plan LawPlan, in Inputs) error {
-	if bite.Off("lawgate/laws-have-a-source") {
-		return nil
-	}
 	return checkSource(plan.Fields[FieldSource], in)
 }
 

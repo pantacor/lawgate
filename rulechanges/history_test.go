@@ -45,8 +45,13 @@ func TestAuditRejectsRetroactiveNoteWithoutItsOwnApprovalTrailer(t *testing.T) {
 	approvedEarlier := "show -s --format=%(trailers:only,unfold) " + renameID
 	fixture[approvedEarlier] = "Rule-change-approved-by: owner"
 	err := fakeHistory(t, fixture).audit("base", "head", io.Discard)
-	if err == nil || !strings.Contains(err.Error(), retroID) {
+	want := retroID + ": Rule-change-approves requires a Rule-change-approved-by audit trailer"
+	if err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("expected retroactive audit trailer failure on %s, got %v", retroID, err)
+	}
+	fixture["show -s --format=%(trailers:only,unfold) "+retroID] = ""
+	if err := fakeHistory(t, fixture).audit("base", "head", io.Discard); err != nil {
+		t.Fatalf("a commit with no approval note must pass the audit: %v", err)
 	}
 }
 

@@ -1,4 +1,4 @@
-// lawgate site: the gate card demo in the hero, the example tabs, and copy buttons.
+// lawgate site: the gate card in the hero, the demo, the example tabs, and copy buttons.
 const root = document.documentElement;
 root.classList.remove("no-js");
 root.classList.add("js");
@@ -6,11 +6,11 @@ root.classList.add("js");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- Gate card: check each law, pass one change, refuse the next ---------- */
-// Two example changes. The second removes the payload check, so the law that
-// forbids an empty payload breaks and the gate refuses the change.
+// Two example changes to the wallet. The second deletes the balance check, so
+// the two laws that depend on it break and the gate refuses the change.
 const CHANGES = [
-  { label: "Change 1: add a retry log line", broken: -1 },
-  { label: "Change 2: remove the payload check", broken: 3 },
+  { label: "Change 1: add a receipt email", broken: [] },
+  { label: "Change 2: delete the balance check", broken: [0, 1] },
 ];
 
 function gateCard() {
@@ -43,7 +43,7 @@ function gateCard() {
   }
 
   function finish(current) {
-    const refused = current.broken >= 0;
+    const refused = current.broken.length > 0;
     setPhase(refused ? "Refused" : "Passed", refused);
     timer = setTimeout(check, restMs);
   }
@@ -56,7 +56,7 @@ function gateCard() {
     change.textContent = current.label;
     let i = 0;
     timer = setInterval(() => {
-      const broken = i === current.broken;
+      const broken = current.broken.includes(i);
       setRow(rows[i], broken ? "is-broken" : "", broken ? "Broken" : "Holds");
       i++;
       if (i < rows.length) return;
@@ -76,6 +76,20 @@ function gateCard() {
     else settle();
   }, { threshold: 0.4 });
   io.observe(list);
+}
+
+/* ---------- Demo: reveal the prompt and each outcome as it scrolls into view ---------- */
+// Each card is watched on its own. The demo as a whole is taller than a phone
+// screen, so a share of the whole demo might never be visible at once.
+function demo() {
+  const cards = document.querySelectorAll("#demo .demo-ask, #demo .outcome");
+  const io = new IntersectionObserver((entries) => {
+    entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+      entry.target.classList.add("is-in");
+      io.unobserve(entry.target);
+    });
+  }, { rootMargin: "0px 0px -10% 0px" });
+  cards.forEach((card) => io.observe(card));
 }
 
 /* ---------- Example tabs: machine law, test law, kernel law ---------- */
@@ -126,5 +140,6 @@ function copyButtons() {
 }
 
 gateCard();
+demo();
 tabs();
 copyButtons();

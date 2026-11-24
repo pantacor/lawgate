@@ -59,23 +59,25 @@ and the Pantavisor AI stack into one framework both repos share.
   merged-results pipelines).
 - The example generates worker state types and checks their freshness as a law.
 - The example tests the per-pass retry limit through a load fault and the generated retry transition, in live runs and replay.
-- The gate reruns agreed test and script enforcers with `LAWGATE_BITE` and requires failure, unless the law records a reason under `Bites: not yet.`.
+- The gate reruns agreed script and Node test enforcers with `LAWGATE_BITE` and requires failure, unless the law records a reason under `Bites: not yet.`.
 
 - `timeout_seconds` per module in `lawgate.json` (default 300, 1 to 86400) bounds every command the gate runs for it, including test discovery.
 
 - cgo ownership follows `#include`, `#cgo -I`, `-include` and `-imacros` from every file of a package, splits `#cgo` flags with Go's quoting rules, and reports an include that goes through a symbolic link, uses an unknown variable, is named by a macro, or leaves the repository outside the owner's `outside_includes` list in `lawgate.json` (approved directories and system headers are reported once as notes).
 - A Node enforcer binds only to a real `test(...)`/`it(...)` call in a file the runner loads; `.jsx` and `.tsx` sources are followed through their imports.
 - A recorded bite gap (`Bites: not yet.` or `Enforced by: not yet.`) is reported as pending with its reason in every report, never as a pass.
-- Bite reruns are scoped: lawgate's own hooks use the reserved `lawgate/` prefix and are recognised by the module path its own `go.mod` declares, a hook counts only when the enforcing test's package reaches it, and a control rerun naming an unrelated law must pass first. When that control fails, a rerun with an empty selector tells a broken tagged build from an enforcer that rejects every selection.
-- Go bite reruns keep `-C`, behaviour flags (`-short`, `-timeout`, `-race`) and test-binary arguments, with one merged `-tags`. They drop the flags that write files (`-coverprofile` and the other profiles, `-trace`, `-outputdir`), so a rerun never replaces what the configured command wrote.
-- `bite.Off` is active only in builds with the `lawgate_bite` tag, which the gate's bite reruns pass; any other build ignores `LAWGATE_BITE`, and the `lawgate` command refuses to run while it is set.
-- A law enforced by tests needs a `bite.Off("<law>")` call in non-test Go code of its module, or a `Bites: not yet. <why>` gap.
+- A law enforced by a Go test names its subject in `LAWS.md` (`- Subject: <import path>.<Func>` or `<import path>.<Type>.<Method>`, several per law, one or more per line), or records `- Subject: not yet. <why>`, which stays pending; an agreed Go-test law with neither fails `laws-bite`. The subject may live in another module of the repository that the law's module builds against.
+- Go bites are gate-chosen mutations of the subject (package `mutate`): each `if`, `for` and expression-less `switch` case condition and each named condition (a variable assigned a comparison or `&&`/`||`) is negated, each comparison in it flipped (`<`/`<=`, `>`/`>=`, `==`/`!=`), and each guarded return disabled; the law's enforcing tests must fail on every mutant, and a surviving mutant fails `laws-bite` naming its file, line and change. A subject with no guard condition fails too.
+- Mutants are compiled through `go test -overlay` (in `GOFLAGS`), one run per mutant, at most 64 per subject (a truncated run says how many it checked); the repository is never written. The runs keep the configured `-C`, tags, behaviour flags and test-binary arguments and drop the flags that write files, so the configured profile still describes the normal run.
+- A condition a function returns (`return strings.TrimSpace(job.Payload) != ""`) or declares with `var` is a guard too, mutated like an `if` condition; a condition is recognised by its form (a comparison, `&&`/`||` or `!`). The mutation cache key carries a rules version, so runs cached under older rules are checked again.
+- Limit: a guard that only passes an error up unchanged (`if err != nil { return <zero values>, err }`, the error bare, wrapped by `fmt.Errorf` with `%w` or joined by `errors.Join`) is not mutated, since error propagation is not law behaviour; every verdict says "N error-propagation guards not mutated". Any other use of the error in a guard (`err != nil && …`, `errors.Is`, a branch that returns a value or changes state) is still mutated.
+- A run that killed every mutant is cached under the user cache directory, keyed by the subject's fingerprint and the proof's (the enforcing tests and their package's test files); an unchanged law is not mutated again, and a survivor is never cached.
+- Go code holds no test switch: the `bite` package offers no hook, only the `LAWGATE_BITE` name and the reserved `lawgate/` prefix that Node and script reruns use, and the `lawgate` command refuses to run while the variable is set.
+- The example names `hasPayload` as the subject of `rejects-empty-payload`, a function that holds only that guard.
 - A bitten script must exit 1 and print `lawgate: rejects <law>`; any other failure is an infrastructure error.
 - A Node bite on a direct `node --test` command reruns only the tests whose name contains the enforcer's (`--test-name-pattern`); any other Node runner reruns its whole suite.
 - When that pattern skips the enforcer (Node skips a `test()` nested in a parent whose name does not match), the rerun falls back to the whole test command. A rerun that still has no result for the named test is reported as "did not run", with or without the pattern.
 - `LAWS.md` refuses a law whose name starts with the reserved `lawgate/` prefix, and reads no enforcer for it.
-- A lawgate binary without Go build information reports that once as an infrastructure error and checks no Go bite, instead of reporting every hook as missing.
-- The bite phase lists a module's tagged import closure once and scans each test package's hooks once, however many laws its tests enforce.
 - A bite rerun that fails reports the named test's own output, never the raw `go test -json` stream.
 - The summary lists items that wait on a decision under `### Pending`, apart from `### What broke`, and counts "1 failure" in the singular.
 - Commands the gate runs refuse arguments that reach a repository file through a symbolic link, matching ownership.
@@ -162,3 +164,9 @@ and the Pantavisor AI stack into one framework both repos share.
 - A failing Node bite control or mutation reports only the named test's own TAP block (`not ok` line and YAML diagnostics), not the whole TAP stream.
 - Rule discovery checks cgo include and forced-header paths for symbolic links as written, protects every repository header the compiler's search order could supply, and reports `#cgo pkg-config:` directives while protecting the package tree.
 - `outside_includes` refuses `/` and any directory that contains or is the repository root.
+- `lawgate lock` pins agreed Go test functions, their reachable helpers, and protected subjects in the owner-reviewed `LAWS.lock`.
+- `lawgate check --base` replays approved Go proofs against candidate code and checks whether the base lock authorizes removing an agreed law. The supplied CI templates pass the base commit.
+- `lawgate review [--base REF] [--json]`: a branch report (Markdown or JSON) that ties every changed hunk to the machine states, sites, law subjects, enforcing tests and laws it touches, with their verdicts, the commits behind it, the rule changes (classified by `rulechanges`) and their audit trailers, and the proof or subject changes of `LAWS.lock`; `--pr` asks `gh` or `glab` for the pull or merge request of each commit.
+- `lawgate review -lsp`: a language server for editors (code lenses, hover, go to definition, diagnostics and the `lawgate.review`, `lawgate.reviewMarkdown`, `lawgate.why`, `lawgate.reindex`, `lawgate.summary` and `lawgate.index` commands) that re-indexes a second after a `.go` file or a `LAWS.md` is saved. See `docs/REVIEW.md`.
+- `runner`: `-index FILE` writes the versioned machine index (`review/index`) that `lawgate review` reads: states, sites resolved to their source line and declaration, law verdicts and drift.
+- VS Code extension `editors/vscode` ("Lawgate"): the branch review view, notes on changed lines, the report panel, "why did this line change?" and the laws' verdict in the status bar, served by `lawgate review -lsp`; CI builds `lawgate.vsix` as an artifact.

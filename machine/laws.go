@@ -3,8 +3,6 @@ package machine
 import (
 	"errors"
 	"fmt"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 // A Law is an invariant over a declared machine. Machines are small finite
@@ -69,9 +67,6 @@ func CheckLaws(m *Machine, laws []Law) ([]Verdict, error) {
 }
 
 func checkLaw(m *Machine, law Law) (Verdict, error) {
-	if bite.Off("lawgate/laws-bite") {
-		return Verdict{Law: law, Violations: law.Check(m)}, nil
-	}
 	if law.Witness == nil {
 		return Verdict{}, fmt.Errorf("law %s has no Witness", law.Name)
 	}

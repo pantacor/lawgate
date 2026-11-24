@@ -51,6 +51,7 @@ func (result *moduleResult) recordError(name string, err error) {
 func checkCommand(arguments []string, output io.Writer) error {
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
 	root := flags.String("root", ".", "repository root")
+	base := flags.String("base", "", "replay approved proofs from this Git commit")
 	parent := flags.String("out", "laws-report", "parent directory for run reports")
 	if err := flags.Parse(arguments); err != nil {
 		return err
@@ -74,10 +75,10 @@ func checkCommand(arguments []string, output io.Writer) error {
 		return err
 	}
 	fmt.Fprintln(output, directory)
-	return check(absoluteRoot, directory)
+	return check(absoluteRoot, directory, *base)
 }
 
-func check(root, directory string) error {
+func check(root, directory, base string) error {
 	meta := checkMetadata(root)
 	config, err := inventory.Load(root)
 	if err != nil {
@@ -92,28 +93,26 @@ func check(root, directory string) error {
 	goModules, moduleErr := inventory.GoModules(root)
 	machineProblems := checkMachineInventory(root, config, results, goModules, moduleErr)
 	generationProblems := checkGeneration(root, config, results, goModules)
-	repositoryConfigured := config.Owner != "" || config.Readability != nil
-	repositoryProblems := len(machineProblems) + len(generationProblems)
-	if repositoryConfigured || repositoryProblems > 0 {
-		results = append(results, moduleResult{Path: "repository"})
-	}
 	meta.Product = config.Product
 	reportErrors := runModulePhases(root, directory, config, results, meta)
 	repo, notes := checkRepository(root, config)
-	if len(results) > len(config.Modules) {
-		if len(machineProblems) > 0 {
-			recordProblems(&repo, "machine inventory", machineProblems)
-		}
-		if len(generationProblems) > 0 {
-			recordProblems(&repo, freshnessLaw, generationProblems)
-		}
-		results[len(config.Modules)] = repo
+	recordRepositoryProblems(&repo, "machine inventory", machineProblems)
+	recordRepositoryProblems(&repo, freshnessLaw, generationProblems)
+	checkAnchoredProofs(root, base, config, &repo)
+	if len(repo.Verdicts) > 0 {
+		results = append(results, repo)
 	}
 	reportErrors = errors.Join(reportErrors, writeReports(directory, meta, results, notes))
 	if slices.ContainsFunc(results, moduleFailed) {
 		return errors.Join(reportErrors, fmt.Errorf("law checks failed; see %s", directory))
 	}
 	return reportErrors
+}
+
+func recordRepositoryProblems(result *moduleResult, name string, problems []string) {
+	if len(problems) > 0 {
+		recordProblems(result, name, problems)
+	}
 }
 
 func runModulePhases(root, directory string, config inventory.Config, results []moduleResult, meta report.Meta) error {

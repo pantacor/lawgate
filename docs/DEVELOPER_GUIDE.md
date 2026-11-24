@@ -25,7 +25,9 @@ The module is `github.com/pantacor/lawgate`. Each directory is one package.
 | `run` | Records the moves of one pass and refuses an undeclared one (layer 3). |
 | `prove` | Checks a kernel on every input inside declared bounds (layer 4). |
 | `runner` | The shared `cmd/machine` entry point for adopting Go modules. |
-| `bite` | The `bite.Off` hook that lets an enforcer show it can fail. |
+| `bite` | The `LAWGATE_BITE` variable name and the reserved `lawgate/` prefix, for Node and script reruns. |
+| `mutate` | Finds a law's subject and generates its mutants. |
+| `lawslock` | Fingerprints proofs and subjects, and reads and writes `LAWS.lock`. |
 | `readability` | The five readability rules and the baseline ratchet. |
 | `rulechanges` | Finds rule files, writes and checks CODEOWNERS, audits Git history. |
 | `gosource` | Finds Go modules, source files and machine declarations. |
@@ -67,8 +69,9 @@ go run ./cmd/lawgate check
 ```
 
 This checks lawgate with lawgate. It runs the tests of both modules, checks
-the `worker` machine of the example, checks both law documents, reruns each
-enforcer to show that it bites, and checks readability and CODEOWNERS. The
+the `worker` machine of the example, checks both law documents, mutates each
+law's subject to show that its tests bite, compares the proofs with
+`LAWS.lock`, and checks readability and CODEOWNERS. The
 reports go to a new directory under `laws-report/`. Use `--out DIR` to put
 them somewhere else.
 
@@ -83,11 +86,11 @@ example `laws-bite` is enforced by `TestCheckLawsRequiresABreakingWitness`
 and `TestBiteRunsAgreedEnforcers`. The gate checks that these tests exist,
 name the law and ran.
 
-**Its own enforcers bite.** lawgate's hooks use the reserved `lawgate/`
-prefix, as in `bite.Off("lawgate/rule-changes-are-reviewed")`. The gate
-reruns each enforcing test with that selector and expects it to fail. Use
-this prefix only inside lawgate. A `LAWS.md` in an adopting repository is
-refused when a law name starts with it.
+**Its own enforcers bite.** Each law in `LAWS.md` names its subject, such as
+`github.com/pantacor/lawgate/run.cursor.checkContinuity`. The gate mutates
+the subject and expects the law's tests to fail. lawgate's Go code has no
+test switch. The proofs are pinned in `LAWS.lock`, and CI replays the base
+commit's proofs with `--base`.
 
 **Its code passes the readability rules.** `TestCoreFollowsTheReadabilityRule`
 runs the checker over the whole repository and fails on any finding. It first
@@ -142,9 +145,11 @@ go run ./cmd/lawgate check-codeowners
 
 1. Write the behaviour and its test in the package that owns it.
 2. If the test enforces a law, name the law in the test's doc comment.
-3. Guard the behaviour with `bite.Off("lawgate/<law-name>")`, and make sure
-   the test fails when the hook is on.
-4. Run `go run ./cmd/lawgate check`.
+3. Ask the owner to add the law's `Subject:` line to `LAWS.md`. Keep the
+   subject a small function that holds the law's guard.
+4. Run `go run ./cmd/lawgate check`. If a mutant survives, add the missing
+   case to the test. Run `go run ./cmd/lawgate lock` when a proof or a
+   subject changed; the owner reviews `LAWS.lock`.
 5. Add a line to `CHANGELOG.md`.
 
 An error message should say what is wrong and what to do. Users read these

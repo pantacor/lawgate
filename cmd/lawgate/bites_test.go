@@ -6,94 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/pantacor/lawgate/inventory"
 	"github.com/pantacor/lawgate/lawsdoc"
 )
-
-// TestBiteRunsAgreedEnforcers enforces laws-bite for both Go and scripts.
-func TestBiteRunsAgreedEnforcers(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, "sub")
-	writeFixture(t, root, "sub/law_test.go", hookedBiteTestSource)
-	writeExecutable(t, root, "rules/bites.sh", "#!/bin/sh\ntest -f go.mod || exit 2\n"+rejectScriptLaw("script-law"))
-	writeExecutable(t, root, "rules/blind.sh", "#!/bin/sh\nexit 0\n")
-	command := []string{"go", "test", "-json", "-count=1", "-run", "^(TestLaw|TestSecondLaw|TestBlind|TestSkips)$", "./..."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	result := biteFixture(module, root)
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", passed, "", "example.test/bites/sub/TestLaw", "TestSecondLaw")
-	expectBite(t, result, "script-law", passed, "")
-	expectBite(t, result, "blind-law", failed, "passed")
-	expectBite(t, result, "blind-script", failed, "passed")
-	expectBite(t, result, "skipped-law", failed, "did not fail")
-	expectBite(t, result, "gap-law", pending, "owner recorded a gap", "TestBlind", "rules/blind.sh")
-}
-
-const hookedBiteTestSource = `package sub
-import "testing"
-func TestLaw(t *testing.T) {
-	if !acceptsLaw() { t.Fatal("go-law") }
-}
-func TestSecondLaw(t *testing.T) {
-	if !acceptsLaw() { t.Fatal("go-law") }
-}
-func TestLawOther(t *testing.T) { t.Fatal("unselected test should never run") }
-func TestBlind(t *testing.T) { _ = "blind-law and gap-law" }
-func TestSkips(t *testing.T) {
-	if skipLaw() { t.Skip("skipped-law") }
-}
-`
-
-func writeBiteGoModule(t *testing.T, root, subdir string) {
-	t.Helper()
-	writeBiteModuleManifest(t, root)
-	writeFixture(t, root, filepath.Join(subdir, "hook.go"), biteHookSource)
-}
-
-func writeBiteModuleManifest(t *testing.T, root string) {
-	t.Helper()
-	local, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	mod := "module example.test/bites\n\ngo 1.25\n\nrequire github.com/pantacor/lawgate v0.0.0\n"
-	mod += "replace github.com/pantacor/lawgate => " + strconv.Quote(local) + "\n"
-	writeFixture(t, root, "go.mod", mod)
-}
-
-const biteHookSource = `package sub
-import "github.com/pantacor/lawgate/bite"
-func acceptsLaw() bool { return !bite.Off("go-law") }
-func skipLaw() bool { return bite.Off("skipped-law") }
-func unrelatedHook() bool { return bite.Off("blind-law") }
-func shortLawOff() bool { return bite.Off("short-law") }
-`
-
-const biteTestSource = `package sub
-import ("github.com/pantacor/lawgate/bite"; "testing")
-func TestLaw(t *testing.T) {
-	if bite.Off("go-law") { t.Fatal("go-law") }
-}
-`
-
-func biteFixture(module inventory.Module, root string) moduleResult {
-	testDoc := strings.Replace(biteLaw("go-law", "test", "example.test/bites/sub/TestLaw"), "- Status:", "  test `TestSecondLaw`\n- Status:", 1)
-	testDoc += biteLaw("blind-law", "test", "TestBlind")
-	testDoc += biteLaw("skipped-law", "test", "TestSkips")
-	gap := biteLaw("gap-law", "test", "TestBlind")
-	gap = strings.Replace(gap, "- Status:", "  script `rules/blind.sh`\n- Status:", 1)
-	testDoc += gap + "- Bites: not yet. owner recorded a gap\n"
-	scripts := biteLaw("script-law", "script", "bites.sh") + biteLaw("blind-script", "script", "blind.sh")
-	shared := lawDocument{Path: "rules/laws.md", Plans: lawsdoc.Plan(scripts)}
-	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(testDoc), SharedDocs: []lawDocument{shared}}
-	checkTests(root, module, &result)
-	checkScripts(root, shared, &result)
-	return result
-}
 
 func TestBiteRequiresFailureFromTheNamedNodeTest(t *testing.T) {
 	root := t.TempDir()
@@ -107,58 +25,6 @@ func TestBiteRequiresFailureFromTheNamedNodeTest(t *testing.T) {
 	expectBite(t, result, "real-law", passed, "")
 	expectBite(t, result, "unrelated-law", failed, "did not fail")
 }
-
-func TestBiteUsesActiveGoBuild(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, filepath.Join(root, "sub"), ".")
-	writeFixture(t, root, "sub/law_test.go", "//go:build bithook\n\n"+hookedBiteTestSource)
-	command := []string{"env", "GOWORK=off", "go", "test", "-C", "sub", "-tags", "bithook", "-json", "-run", "^TestLaw$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	plan := lawsdoc.Plan(biteLaw("go-law", "test", "TestLaw"))
-	result := moduleResult{Ready: true, Plans: plan}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", passed, "")
-}
-
-func TestBiteChecksExampleEnforcers(t *testing.T) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	module := inventory.Module{Path: "example", Language: "go", Laws: "example/LAWS.md"}
-	doc, err := readLawDocument(root, module.Laws)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := moduleResult{Ready: true, Plans: doc.Plans}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "rejects-empty-payload", passed, "")
-	expectBite(t, result, "generated-is-fresh", passed, "")
-}
-
-func TestBitePreservesGoTestFlags(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", biteShortSource)
-	command := []string{"go", "test", "-json", "-short", "-timeout", "1m", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	plan := lawsdoc.Plan(biteLaw("short-law", "test", "TestShort"))
-	result := moduleResult{Ready: true, Plans: plan}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "short-law", passed, "")
-}
-
-const biteShortSource = `package sub
-import ("testing"; "time")
-func TestShort(t *testing.T) {
-	if !testing.Short() { t.Fatal("short-law requires -short") }
-	if deadline, ok := t.Deadline(); !ok || time.Until(deadline) > time.Minute { t.Fatal("short-law requires -timeout") }
-	if shortLawOff() { t.Fatal("short-law") }
-}
-`
 
 const nodeBiteSource = `#!/bin/sh
 printf '%s\n' 'TAP version 13'
@@ -249,18 +115,6 @@ func scriptBite(t *testing.T, root, script string) moduleResult {
 	return result
 }
 
-func TestBiteRejectsTestOnlyHook(t *testing.T) {
-	root := t.TempDir()
-	writeBiteModuleManifest(t, root)
-	writeFixture(t, root, "law_test.go", biteTestSource)
-	command := []string{"go", "test", "-json", "-run", "^TestLaw$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(biteLaw("go-law", "test", "TestLaw"))}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", failed, "bite hook missing")
-}
-
 func TestBiteGapIsReportedAsPendingReason(t *testing.T) {
 	item := verdict{Name: "laws-bite (go-law: LAWS.md, TestLaw)", Status: pending, Detail: "bite gap: owner recorded a gap"}
 	if got := reportVerdict(item); !got.IsPending() || got.Law.Pending != item.Detail {
@@ -273,7 +127,7 @@ func TestBiteDiscoveryReportsOneInfrastructureError(t *testing.T) {
 	writeFixture(t, root, "go.mod", "module example.test/bites\n\ngo 1.25\n")
 	command := []string{"go", "test", "-overlay", "unknown", "."}
 	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	doc := biteLaw("first-law", "test", "TestFirst") + biteLaw("second-law", "test", "TestSecond")
+	doc := goLaw("first-law", "TestFirst", "example.test/bites.First") + goLaw("second-law", "TestSecond", "example.test/bites.Second")
 	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(doc)}
 	checkLawsDoc(root, module, &result)
 	checkBites(root, module, &result)
@@ -317,38 +171,3 @@ func assertAmbientBiteRefused(t *testing.T, binary, value string) {
 		t.Fatalf("LAWGATE_BITE=%q: exit %v, output %s", value, err, out)
 	}
 }
-
-func TestBiteKeepsRepositoryWorkspaceBoundary(t *testing.T) {
-	parent := t.TempDir()
-	root := filepath.Join(parent, "repo")
-	writeFixture(t, parent, "go.work", "go 1.25\nuse ./missing\n")
-	writeFixture(t, root, "lawgate.json", "{}")
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", hookedBiteTestSource)
-	command := []string{"go", "test", "-json", "-run", "^TestLaw$", "."}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(biteLaw("go-law", "test", "TestLaw"))}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", passed, "")
-}
-
-func TestBitePreservesTestBinaryArgs(t *testing.T) {
-	root := t.TempDir()
-	writeBiteGoModule(t, root, ".")
-	writeFixture(t, root, "law_test.go", biteArgsTestSource)
-	command := []string{"go", "test", "-json", ".", "-args", "-strict"}
-	module := inventory.Module{Path: ".", Language: "go", Laws: "LAWS.md", TestCommand: command}
-	result := moduleResult{Ready: true, Plans: lawsdoc.Plan(biteLaw("go-law", "test", "TestLaw"))}
-	checkTests(root, module, &result)
-	checkBites(root, module, &result)
-	expectBite(t, result, "go-law", passed, "")
-}
-
-const biteArgsTestSource = `package sub
-import ("flag"; "testing")
-var strict = flag.Bool("strict", false, "require strict test")
-func TestLaw(t *testing.T) {
-	if !*strict || !acceptsLaw() { t.Fatal("go-law") }
-}
-`

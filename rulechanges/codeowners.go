@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/gosource"
 	"github.com/pantacor/lawgate/inventory"
 )
@@ -79,9 +78,6 @@ func checkCoverage(name string, data []byte, files []string, owner, platform str
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	var uncovered []string
-	if bite.Off("lawgate/rule-changes-are-reviewed") {
-		return nil
-	}
 	for _, file := range files {
 		if !sections.require(file, owner) {
 			uncovered = append(uncovered, file)

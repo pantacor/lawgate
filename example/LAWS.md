@@ -16,6 +16,7 @@ No generated worker state type differs from its machine declaration.
 
 - Source: `../LAWS.md`, *generated-is-fresh* (agreed 2026-11-19).
 - Enforced by: test `TestWorkerStatesAreFresh`
+- Subject: github.com/pantacor/lawgate/gen.targetStatus
 - Status: agreed 2026-11-19
 
 ## validate-before-store
@@ -33,4 +34,5 @@ Processing a job with an empty payload fails before writing a completed result.
 
 - Source: `../README.md`, *Example adopting module* (agreed 2026-11-20).
 - Enforced by: test `TestRejectsEmptyPayload`
+- Subject: github.com/pantacor/lawgate/example.hasPayload
 - Status: agreed 2026-11-20

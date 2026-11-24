@@ -11,6 +11,7 @@ import (
 // TestCoreFollowsTheReadabilityRule enforces readable-laws-code over the whole
 // lawgate repository.
 func TestCoreFollowsTheReadabilityRule(t *testing.T) {
+	t.Run("malformed Go source", checkMalformedSource)
 	// The checker must still see a known violation, or a repository with
 	// zero findings proves nothing (laws-bite).
 	if len(mustCheck(t, "nesting_fail.go", nestingFailSrc())) == 0 {
@@ -22,6 +23,13 @@ func TestCoreFollowsTheReadabilityRule(t *testing.T) {
 	}
 	for _, f := range findings {
 		t.Errorf("self-check violation [%s] %s:%d (%s): %s", f.Rule, f.Path, f.Line, f.Func, f.Message)
+	}
+}
+
+func checkMalformedSource(t *testing.T) {
+	_, err := CheckFile("malformed.go", []byte("package sample\nfunc broken() {\n"))
+	if err == nil || !strings.Contains(err.Error(), "parse malformed.go:") {
+		t.Fatalf("malformed Go source should report a parse error, got %v", err)
 	}
 }
 

@@ -28,10 +28,16 @@ type Entry struct {
 	Laws       []machine.Law // checked alongside Machine.Laws
 }
 
-// Main runs the standard machine-runner CLI over entries and exits:
+// Main runs the standard machine-runner CLI over entries and exits. With
+// -laws:
 //   - 0 when every machine resolves and every law holds (or is pending),
 //   - 1 when resolution fails or any law breaks (after writing -junit if set),
 //   - 2 on flag, usage, or JUnit I/O errors.
+//
+// With -index FILE (FILE "-" is standard output) it writes the machine index
+// lawgate review reads (package review/index) and exits 0 once it is written,
+// whatever the laws' verdicts (they are in the index), or 2 on flag, usage or
+// I/O errors.
 func Main(entries []Entry) {
 	os.Exit(Run(os.Args[1:], entries, os.Stdout, os.Stderr))
 }
@@ -44,10 +50,14 @@ func Run(args []string, entries []Entry, stdout, stderr io.Writer) int {
 }
 
 func runIn(root string, args []string, entries []Entry, stdout, stderr io.Writer) int {
-	junitPath, ok := parseArgs(args, stderr)
+	options, ok := parseArgs(args, stderr)
 	if !ok {
 		return 2
 	}
+	if options.index != "" {
+		return indexStatus(writeIndex(root, options.index, entries, stdout), stderr)
+	}
+	junitPath := options.junit
 	runs := CheckIn(root, entries)
 	if junitPath != "" {
 		if err := report.WriteJUnit(junitPath, runs); err != nil {
@@ -60,23 +70,55 @@ func runIn(root string, args []string, entries []Entry, stdout, stderr io.Writer
 	return exitStatus(runs)
 }
 
-func parseArgs(args []string, stderr io.Writer) (string, bool) {
+// runOptions are the runner's flags: -laws with an optional -junit, or
+// -index alone.
+type runOptions struct {
+	laws  bool
+	junit string
+	index string
+}
+
+func parseArgs(args []string, stderr io.Writer) (runOptions, bool) {
+	var options runOptions
 	fs := flag.NewFlagSet("machine", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	laws := fs.Bool("laws", false, "check declared machine laws")
-	junit := fs.String("junit", "", "write JUnit XML report to file")
+	fs.BoolVar(&options.laws, "laws", false, "check declared machine laws")
+	fs.StringVar(&options.junit, "junit", "", "write JUnit XML report to file")
+	fs.StringVar(&options.index, "index", "", "write the machine index for lawgate review to `file` (- for stdout)")
 	if err := fs.Parse(args); err != nil {
-		return "", false
+		return options, false
 	}
 	if fs.NArg() != 0 {
 		fmt.Fprintln(stderr, "machine runner accepts flags only")
-		return "", false
+		return options, false
 	}
-	if !*laws {
-		fmt.Fprintln(stderr, "pass -laws to check machine laws")
-		return "", false
+	if problem := options.problem(); problem != "" {
+		fmt.Fprintln(stderr, problem)
+		return options, false
 	}
-	return *junit, true
+	return options, true
+}
+
+// problem says why the flags do not ask for exactly one action.
+func (options runOptions) problem() string {
+	indexing := options.index != ""
+	switch {
+	case indexing && options.laws:
+		return "pass -laws or -index, not both"
+	case indexing && options.junit != "":
+		return "-junit goes with -laws, not -index"
+	case !indexing && !options.laws:
+		return "pass -laws to check machine laws, or -index FILE to write the review index"
+	}
+	return ""
+}
+
+func indexStatus(err error, stderr io.Writer) int {
+	if err != nil {
+		fmt.Fprintf(stderr, "write index: %v\n", err)
+		return 2
+	}
+	return 0
 }
 
 func finishWithJUnit(runs []report.LawRun, stderr io.Writer) int {

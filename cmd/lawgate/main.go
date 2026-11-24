@@ -28,7 +28,7 @@ func main() {
 
 func run(arguments []string, output io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New("usage: lawgate init|check|readability-baseline|rule-files|codeowners|check-codeowners|rule-changes")
+		return errors.New("usage: lawgate init|check|lock|review|readability-baseline|rule-files|codeowners|check-codeowners|rule-changes")
 	}
 	switch arguments[0] {
 	case "init":
@@ -37,10 +37,14 @@ func run(arguments []string, output io.Writer) error {
 		return baselineCommand(arguments[1:])
 	case "check":
 		return checkCommand(arguments[1:], output)
+	case "lock":
+		return lockCommand(arguments[1:], output)
 	case "rule-files", "codeowners", "check-codeowners":
 		return ownersCommand(arguments[0], arguments[1:], output)
 	case "rule-changes":
 		return changesCommand(arguments[1:], output)
+	case "review":
+		return reviewCommand(arguments[1:], output)
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}

@@ -43,3 +43,12 @@ func TestCodeownersFallbackUsesPlatformSection(t *testing.T) {
 		t.Errorf("unexpected GitLab fallback:\n%s", gitlab)
 	}
 }
+
+func TestLawChecksReceiveBaseCommit(t *testing.T) {
+	if !strings.Contains(GitHub, `check --base "$LAW_BASE"`) {
+		t.Error("GitHub law checks do not replay the base proof")
+	}
+	if !strings.Contains(GitLab, `check --base "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"`) {
+		t.Error("GitLab law checks do not replay the base proof")
+	}
+}

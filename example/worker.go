@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 // Job is a unit of work processed by the example worker.
@@ -39,8 +37,13 @@ func Process(id string, store Store) error {
 
 func isValidJob(job Job) bool {
 	hasID := strings.TrimSpace(job.ID) != ""
-	hasPayload := bite.Off("rejects-empty-payload") || strings.TrimSpace(job.Payload) != ""
-	return hasID && hasPayload
+	return hasID && hasPayload(job)
+}
+
+// hasPayload is the subject of the rejects-empty-payload law: the gate
+// mutates this condition and the law's test must fail.
+func hasPayload(job Job) bool {
+	return strings.TrimSpace(job.Payload) != ""
 }
 
 func fault(tag string, err error) error {

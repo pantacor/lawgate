@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/machine"
 )
 
@@ -107,9 +106,6 @@ func (c *cursor) moveLimit(m *machine.Machine, move Transition) (int, error) {
 // entry, a move that leaves a state the pass is not in, or one that is
 // neither a named edge nor a catch.
 func (c *cursor) checkContinuity(m *machine.Machine, move Transition) error {
-	if bite.Off("lawgate/no-silent-drift") {
-		return nil
-	}
 	if move.Edge == EnterEdge {
 		return fmt.Errorf("entered %q in the middle of the pass of %s, which is in %q", move.To, m.Name, c.at)
 	}

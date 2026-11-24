@@ -20,6 +20,8 @@ const Filename = "lawgate.json"
 
 const DefaultBaseline = ".lawgate-readability"
 
+const DefaultLock = "LAWS.lock"
+
 type Readability struct {
 	Baseline string   `json:"baseline"`
 	Include  []string `json:"include,omitempty"`
@@ -33,6 +35,7 @@ type RulePackage struct {
 }
 
 type Config struct {
+	Lock         string        `json:"lock,omitempty"`
 	Product      string        `json:"product,omitempty"`
 	Owner        string        `json:"owner,omitempty"`
 	Platform     string        `json:"platform,omitempty"`
@@ -123,7 +126,18 @@ func (config Config) validateGateFiles() error {
 	return nil
 }
 
+// LockPath returns the repository-relative path of the proof lock.
+func (config Config) LockPath() string {
+	if config.Lock == "" {
+		return DefaultLock
+	}
+	return config.Lock
+}
+
 func (config Config) validateOptions() error {
+	if config.Lock != "" && !validLockPath(config.Lock) {
+		return fmt.Errorf("%s: invalid proof lock path %q", Filename, config.Lock)
+	}
 	if err := config.validatePlatform(); err != nil {
 		return err
 	}
@@ -134,6 +148,13 @@ func (config Config) validateOptions() error {
 		return err
 	}
 	return config.validateReadability()
+}
+
+func validLockPath(name string) bool {
+	reserved := name == "." || name == Filename || path.Base(name) == "LAWS.md"
+	gitPath := name == ".git" || strings.HasPrefix(name, ".git/")
+	available := !reserved && !gitPath
+	return validPath(name) && available
 }
 
 // validateOutsideIncludes refuses an outside include directory that is

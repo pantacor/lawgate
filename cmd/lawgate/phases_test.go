@@ -9,6 +9,7 @@ import (
 
 	"github.com/pantacor/lawgate/inventory"
 	"github.com/pantacor/lawgate/lawsdoc"
+	"github.com/pantacor/lawgate/rulechanges"
 )
 
 func TestCheckUsesMachineReportAndSharedDocumentation(t *testing.T) {
@@ -185,6 +186,7 @@ func assertReadabilityBaselineLinkRefused(t *testing.T, link baselineLink) {
 // TestCheckFailsUncoveredRuleFile enforces rule-changes-are-reviewed: a
 // rule file the required owner does not review fails the gate.
 func TestCheckFailsUncoveredRuleFile(t *testing.T) {
+	t.Run("GitHub CODEOWNERS size", checkCodeownersSize)
 	root := t.TempDir()
 	module := fixtureModule(".", withoutMachines)
 	settings := &inventory.Readability{Baseline: "baseline.txt"}
@@ -204,6 +206,32 @@ func TestCheckFailsUncoveredRuleFile(t *testing.T) {
 	if _, err := runCheck(t, root); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func checkCodeownersSize(t *testing.T) {
+	const limit = 3_000_000
+	const rule = "/LAWS.md @owner\n#"
+	atLimit := rule + strings.Repeat("x", limit-len(rule))
+	assertCodeownersSize(t, "github", atLimit[:limit-1], "")
+	assertCodeownersSize(t, "github", atLimit, "exceeds the supported GitHub CODEOWNERS size")
+	assertCodeownersSize(t, "gitlab", atLimit[:limit-1], "")
+	assertCodeownersSize(t, "gitlab", atLimit, "")
+}
+
+func assertCodeownersSize(t *testing.T, platform, content, wantError string) {
+	t.Helper()
+	root := t.TempDir()
+	writeFixture(t, root, "CODEOWNERS", content)
+	err := rulechanges.CheckOwners(root, []string{"LAWS.md"}, "@owner", platform)
+	if wantError == "" && err == nil {
+		return
+	}
+	if wantError != "" && err != nil {
+		if strings.Contains(err.Error(), wantError) {
+			return
+		}
+	}
+	t.Errorf("%s CODEOWNERS at %d bytes: got %v, want error containing %q", platform, len(content), err, wantError)
 }
 
 func useGitFileList(t *testing.T, root string) {

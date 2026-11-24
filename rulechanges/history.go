@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 type history struct {
@@ -128,7 +126,7 @@ func (repo history) auditCommit(commit revision, cache map[string]map[string]boo
 		return err
 	}
 	unapprovedNote := len(trail.approves) > 0 && len(trail.approvedBy) == 0
-	if unapprovedNote && !bite.Off("lawgate/rule-changes-are-reviewed") {
+	if unapprovedNote {
 		return fmt.Errorf("%s: Rule-change-approves requires a Rule-change-approved-by audit trailer", commit.id)
 	}
 	return nil

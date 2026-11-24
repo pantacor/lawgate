@@ -3,6 +3,7 @@ package run
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/pantacor/lawgate/machine"
@@ -129,10 +130,17 @@ func TestIsPathRefusesBrokenTraces(t *testing.T) {
 	ok := Transition{From: "start", Edge: "Ok", To: "work"}
 	finish := Transition{From: "work", Edge: "Finish", To: "done"}
 	back := Transition{From: "work", Edge: "Back", To: "start"}
+	// A guard that refused every move would pass the refusals below.
+	if err := IsPath(m, []Transition{enterStart, ok, finish}); err != nil {
+		t.Errorf("the declared pass must stay a path: %v", err)
+	}
 	checkNotPath(t, m, "empty")
 	checkNotPath(t, m, "no enter", ok)
 	checkNotPath(t, m, "starts in a state that is not an entry", enterWork, finish)
-	checkNotPath(t, m, "enters in the middle", enterStart, ok, enterWork)
+	err := IsPath(m, []Transition{enterStart, ok, enterWork})
+	if err == nil || !strings.Contains(err.Error(), "in the middle of the pass") {
+		t.Errorf("second entry should be refused as a mid-pass entry, got %v", err)
+	}
 	checkNotPath(t, m, "jumps", enterStart, finish)
 	checkNotPath(t, m, "undeclared", enterStart, ok, back)
 }

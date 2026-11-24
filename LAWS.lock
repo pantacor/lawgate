@@ -1,0 +1,333 @@
+{
+  "version": 1,
+  "laws": [
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "generated-is-fresh",
+      "proof": "e759f95c725ca4304a4baaeea3ddaf58cd2757141e361d5193a0547cbfbd77de",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/cmd/lawgate.generationCheck.run",
+          "fingerprint": "709e2222cb6f6f4cb5b950a6209a447f09e7195fbad51131541bcfa647500691"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/gen.targetStatus",
+          "fingerprint": "04a91dcc47400cd7bcf9b2893153fd18f6d5da4cc60d672ffc75c615108c2a74"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/cmd/lawgate",
+          "name": "TestGenerationRejectsMissingTargetEvidence",
+          "file": "cmd/lawgate/freshness_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/cmd/lawgate",
+          "name": "TestGenerationRejectsUncoveredGeneratedSource",
+          "file": "cmd/lawgate/freshness_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/gen",
+          "name": "TestCheckReportsStaleGeneratedFiles",
+          "file": "gen/check_test.go"
+        }
+      ],
+      "test_files": [
+        "cmd/lawgate/bite_mutation_test.go",
+        "cmd/lawgate/bite_regressions_test.go",
+        "cmd/lawgate/bite_reruns_test.go",
+        "cmd/lawgate/bites_test.go",
+        "cmd/lawgate/check_test.go",
+        "cmd/lawgate/command_inputs_test.go",
+        "cmd/lawgate/evidence_test.go",
+        "cmd/lawgate/freshness_test.go",
+        "cmd/lawgate/init_test.go",
+        "cmd/lawgate/linked_arguments_test.go",
+        "cmd/lawgate/lock_test.go",
+        "cmd/lawgate/owner_flags_test.go",
+        "cmd/lawgate/owner_notes_test.go",
+        "cmd/lawgate/owners_test.go",
+        "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/vendor_owners_test.go",
+        "gen/check_test.go",
+        "gen/gen_test.go"
+      ]
+    },
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "laws-bite",
+      "proof": "59b2d56e99f741a98ff98649648fd745ed6ffa8cffc1e9bba810e694851938fb",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/cmd/lawgate.bitePhase.checkGoLaw",
+          "fingerprint": "5bc25e247568a80b5f507981530e0cf6ff3b2e6c34e399a41c268dfaf00f00f8"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/cmd/lawgate.bitePhase.checkLaw",
+          "fingerprint": "6daf58f5ba229c4c82c39aa505fe10de7786a9e67589ee8ff44e7ebaff283619"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/cmd/lawgate.bitePhase.judge",
+          "fingerprint": "9f38d03663918941e0f572f93ff4fe019162c2b5a1da67cd6f70adbbf0ecc737"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/machine.checkLaw",
+          "fingerprint": "0e05e9ea6975d63c6a152db5146015827ab6d7428a20477a39a67995c640ecc5"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/mutate.Target.Mutants",
+          "fingerprint": "e9621aa5215bdc614e2f9a0bd7b8456cb599202f5fe55e59f866abf357835413"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/cmd/lawgate",
+          "name": "TestBiteRunsAgreedEnforcers",
+          "file": "cmd/lawgate/bite_mutation_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/cmd/lawgate",
+          "name": "TestMutationReportsARunWithoutTheTestsResult",
+          "file": "cmd/lawgate/bite_mutation_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/machine",
+          "name": "TestCheckLawsRequiresABreakingWitness",
+          "file": "machine/witness_test.go"
+        }
+      ],
+      "test_files": [
+        "cmd/lawgate/bite_mutation_test.go",
+        "cmd/lawgate/bite_regressions_test.go",
+        "cmd/lawgate/bite_reruns_test.go",
+        "cmd/lawgate/bites_test.go",
+        "cmd/lawgate/check_test.go",
+        "cmd/lawgate/command_inputs_test.go",
+        "cmd/lawgate/evidence_test.go",
+        "cmd/lawgate/freshness_test.go",
+        "cmd/lawgate/init_test.go",
+        "cmd/lawgate/linked_arguments_test.go",
+        "cmd/lawgate/lock_test.go",
+        "cmd/lawgate/owner_flags_test.go",
+        "cmd/lawgate/owner_notes_test.go",
+        "cmd/lawgate/owners_test.go",
+        "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/vendor_owners_test.go",
+        "machine/graph_test.go",
+        "machine/helpers_test.go",
+        "machine/laws_test.go",
+        "machine/validate_test.go",
+        "machine/witness_test.go"
+      ]
+    },
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "laws-have-a-source",
+      "proof": "9323fd2136168a077c801e764f247a5168b03873342768ee4a278fd9a425702b",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/lawsdoc.checkSource",
+          "fingerprint": "68f0bf594faa0544899534313c8210aa47c56416648e67f874b8bd3bf869f02f"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/lawsdoc",
+          "name": "TestCheckReportsEachProblem",
+          "file": "lawsdoc/check_test.go"
+        }
+      ],
+      "test_files": [
+        "lawsdoc/bites_test.go",
+        "lawsdoc/check_test.go",
+        "lawsdoc/lawsdoc_test.go",
+        "lawsdoc/references_test.go",
+        "lawsdoc/subject_test.go"
+      ]
+    },
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "no-silent-drift",
+      "proof": "95d1263b1115c0209f493c4cf0ef0bb2bbe52efb319e2fccfc878d198441dbd7",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/run.checkMoveShape",
+          "fingerprint": "33a4e4fd11d53e0935bd5a3f1e97d7070638a69a489a65e34950494d9aa6bbab"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/run.cursor.checkContinuity",
+          "fingerprint": "b76b39916448a13fb7d47c1cad837e6c25484424c877859bfcfb52716c931074"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/run",
+          "name": "TestGoChecksContinuity",
+          "file": "run/run_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/run",
+          "name": "TestGoRefusesAnEmptyEdgeName",
+          "file": "run/run_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/run",
+          "name": "TestIsPathRefusesBrokenTraces",
+          "file": "run/run_test.go"
+        }
+      ],
+      "test_files": [
+        "run/run_test.go"
+      ]
+    },
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "readable-laws-code",
+      "proof": "14423ee7131af82d05fb0cd3706cb35317154d6cbfc8331ca4a27ee52641f253",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/readability.CheckFile",
+          "fingerprint": "5232216e696e2273b6ad76950c2f019eb4d399d51d4e195d44893cfcca9ef050"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/readability",
+          "name": "TestCoreFollowsTheReadabilityRule",
+          "file": "readability/readability_test.go"
+        }
+      ],
+      "test_files": [
+        "readability/readability_test.go"
+      ]
+    },
+    {
+      "module": ".",
+      "document": "LAWS.md",
+      "law": "rule-changes-are-reviewed",
+      "proof": "e926d4913544b6bbd942b5b5f60a46606f84f8858826015677dcbd9cbdd6e24a",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/rulechanges.checkCoverage",
+          "fingerprint": "73e66bb8fd50e884cb59cf0f9052b67630f1417f12294f1993b7822f873c600f"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/rulechanges.history.auditCommit",
+          "fingerprint": "140bf163cbfb5ec27d8adcf159cb534c2b366b19e690ac2993ff118ae0f8302f"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/cmd/lawgate",
+          "name": "TestCheckFailsUncoveredRuleFile",
+          "file": "cmd/lawgate/phases_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/rulechanges",
+          "name": "TestAuditRejectsRetroactiveNoteWithoutItsOwnApprovalTrailer",
+          "file": "rulechanges/history_test.go"
+        }
+      ],
+      "test_files": [
+        "cmd/lawgate/bite_mutation_test.go",
+        "cmd/lawgate/bite_regressions_test.go",
+        "cmd/lawgate/bite_reruns_test.go",
+        "cmd/lawgate/bites_test.go",
+        "cmd/lawgate/check_test.go",
+        "cmd/lawgate/command_inputs_test.go",
+        "cmd/lawgate/evidence_test.go",
+        "cmd/lawgate/freshness_test.go",
+        "cmd/lawgate/init_test.go",
+        "cmd/lawgate/linked_arguments_test.go",
+        "cmd/lawgate/lock_test.go",
+        "cmd/lawgate/owner_flags_test.go",
+        "cmd/lawgate/owner_notes_test.go",
+        "cmd/lawgate/owners_test.go",
+        "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/vendor_owners_test.go",
+        "rulechanges/closure_test.go",
+        "rulechanges/codeowners_test.go",
+        "rulechanges/commands_test.go",
+        "rulechanges/files_test.go",
+        "rulechanges/history_test.go",
+        "rulechanges/import_closure_test.go",
+        "rulechanges/linked_inputs_test.go",
+        "rulechanges/local_modules_test.go",
+        "rulechanges/lock_test.go",
+        "rulechanges/module_resolution_test.go",
+        "rulechanges/native_flags_test.go",
+        "rulechanges/native_outside_test.go",
+        "rulechanges/native_paths_test.go",
+        "rulechanges/native_test.go",
+        "rulechanges/node_resolve_test.go",
+        "rulechanges/node_tests_test.go",
+        "rulechanges/package_closure_test.go",
+        "rulechanges/pattern_test.go",
+        "rulechanges/repository_test.go",
+        "rulechanges/vendor_repository_test.go",
+        "rulechanges/vendor_symlink_node_test.go"
+      ]
+    },
+    {
+      "module": "example",
+      "document": "example/LAWS.md",
+      "law": "generated-is-fresh",
+      "proof": "a273b4469c958941307ce542c5575b461a4a662c73ee43379bc4f900616e93a3",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/gen.targetStatus",
+          "fingerprint": "04a91dcc47400cd7bcf9b2893153fd18f6d5da4cc60d672ffc75c615108c2a74"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/example",
+          "name": "TestWorkerStatesAreFresh",
+          "file": "example/worker_test.go"
+        }
+      ],
+      "test_files": [
+        "example/retry_test.go",
+        "example/worker_test.go"
+      ]
+    },
+    {
+      "module": "example",
+      "document": "example/LAWS.md",
+      "law": "no-silent-errors"
+    },
+    {
+      "module": "example",
+      "document": "example/LAWS.md",
+      "law": "rejects-empty-payload",
+      "proof": "d0fa62f78e878e84eb6d82bd23e5d13e8b75ed870c8e219c22e23618838293fb",
+      "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/example.hasPayload",
+          "fingerprint": "7f10764452ccbaae985e94959dcb55a5619745c341f299a9405c3e327e1c5c41"
+        }
+      ],
+      "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/example",
+          "name": "TestRejectsEmptyPayload",
+          "file": "example/worker_test.go"
+        }
+      ],
+      "test_files": [
+        "example/retry_test.go",
+        "example/worker_test.go"
+      ]
+    },
+    {
+      "module": "example",
+      "document": "example/LAWS.md",
+      "law": "validate-before-store"
+    }
+  ]
+}

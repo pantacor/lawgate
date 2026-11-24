@@ -3,7 +3,6 @@ package worker
 import (
 	"io"
 
-	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/gen"
 )
 
@@ -28,8 +27,5 @@ func StateTypeTarget() gen.Target {
 
 // CheckWorkerStateTypes checks that the generated worker state types are current.
 func CheckWorkerStateTypes(out io.Writer) error {
-	if bite.Off("generated-is-fresh") {
-		return nil
-	}
 	return gen.ReportCheck(out, StateTypeTarget())
 }

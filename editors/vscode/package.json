@@ -1,0 +1,174 @@
+{
+  "name": "lawgate",
+  "displayName": "Lawgate",
+  "description": "Review a branch with the laws, proofs and state machines lawgate checks: what governs a line, whether it holds, and why it changed.",
+  "version": "0.1.0",
+  "publisher": "pantacor",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Linters",
+    "SCM Providers",
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/lawgate.json"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lawgate",
+          "title": "Lawgate",
+          "icon": "media/law.svg"
+        }
+      ]
+    },
+    "views": {
+      "lawgate": [
+        {
+          "id": "lawgate.changes",
+          "name": "Branch review"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "lawgate.changes",
+        "contents": "Review the branch against its base: every change with the states, subjects, tests and laws it touches, and why it was made.\n[Review branch](command:lawgate.refresh)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "lawgate.refresh",
+        "title": "Review branch",
+        "category": "Lawgate",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "lawgate.setBase",
+        "title": "Set review base…",
+        "category": "Lawgate",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "lawgate.openReport",
+        "title": "Open review report",
+        "category": "Lawgate",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "lawgate.copyReport",
+        "title": "Copy review report as Markdown",
+        "category": "Lawgate",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "lawgate.toggleNotes",
+        "title": "Toggle notes on changed lines",
+        "category": "Lawgate",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "lawgate.whyLine",
+        "title": "Why did this line change?",
+        "category": "Lawgate"
+      },
+      {
+        "command": "lawgate.reindex",
+        "title": "Re-check machines and laws",
+        "category": "Lawgate"
+      },
+      {
+        "command": "lawgate.restartServer",
+        "title": "Restart language server",
+        "category": "Lawgate"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "lawgate.refresh",
+          "when": "view == lawgate.changes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "lawgate.setBase",
+          "when": "view == lawgate.changes",
+          "group": "navigation@2"
+        },
+        {
+          "command": "lawgate.toggleNotes",
+          "when": "view == lawgate.changes",
+          "group": "navigation@3"
+        },
+        {
+          "command": "lawgate.openReport",
+          "when": "view == lawgate.changes",
+          "group": "navigation@4"
+        },
+        {
+          "command": "lawgate.copyReport",
+          "when": "view == lawgate.changes",
+          "group": "navigation@5"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "lawgate.whyLine",
+          "when": "resourceScheme == file",
+          "group": "lawgate@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Lawgate",
+      "properties": {
+        "lawgate.base": {
+          "type": "string",
+          "default": "",
+          "description": "The branch changes are reviewed against. Empty uses the repository's default branch (git symbolic-ref refs/remotes/origin/HEAD), else origin/main."
+        },
+        "lawgate.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "A lawgate binary. Empty uses `lawgate` from PATH; if there is none, runs `go run github.com/pantacor/lawgate/cmd/lawgate review -lsp` from the workspace root, which uses the version the module pins."
+        },
+        "lawgate.siteLenses": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a code lens on every declared site (its kind, state, step and laws)."
+        },
+        "lawgate.notesOnChangedLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "After a review, put a note on every changed hunk a state, site, subject, test or law governs (visible in editors and diffs)."
+        },
+        "lawgate.mergeRequests": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ask the platform's CLI (gh for GitHub, glab for GitLab), when it is installed and logged in, which pull or merge request brought each commit."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc -p . --noEmit",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --target=node20 --sourcemap",
+    "compile": "npm run check && npm run bundle",
+    "package": "npm run compile && node scripts/copy-license.js && npx --yes @vscode/vsce@3.2.1 package --no-dependencies --allow-missing-repository -o lawgate.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/vscode": "1.90.0",
+    "esbuild": "^0.23.1",
+    "typescript": "5.5.4"
+  }
+}

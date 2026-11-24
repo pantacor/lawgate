@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 const (
@@ -39,9 +37,6 @@ type Finding struct {
 // CheckFile parses a single Go source file and returns all readability findings.
 // If src is nil, the file is read from path.
 func CheckFile(path string, src []byte) ([]Finding, error) {
-	if bite.Off("lawgate/readable-laws-code") {
-		return nil, nil
-	}
 	fset := token.NewFileSet()
 	var srcArg any
 	if src != nil {

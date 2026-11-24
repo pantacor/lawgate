@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/machine"
 )
 
@@ -93,7 +92,7 @@ func targetStatus(target Target) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stale := !bytes.Equal(have, want) && !bite.Off("lawgate/generated-is-fresh")
+	stale := !bytes.Equal(have, want)
 	if stale {
 		return Stale, nil
 	}

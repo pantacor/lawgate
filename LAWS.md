@@ -17,6 +17,7 @@ problem.
 - Source: Owner decision 2026-11-19 (the proof-gated development plan, *Laws of the framework
   itself*).
 - Enforced by: test `TestCheckReportsEachProblem`
+- Subject: github.com/pantacor/lawgate/lawsdoc.checkSource
 - Status: agreed 2026-11-19
 
 ### rule-changes-are-reviewed
@@ -30,6 +31,7 @@ note.
   approval is platform review (CODEOWNERS naming the owner, enforced by
   branch protection), not a typed trailer.
 - Enforced by: test `TestCheckFailsUncoveredRuleFile`, test `TestAuditRejectsRetroactiveNoteWithoutItsOwnApprovalTrailer`
+- Subject: github.com/pantacor/lawgate/rulechanges.checkCoverage, github.com/pantacor/lawgate/rulechanges.history.auditCommit
 - Status: agreed 2026-11-20
 
 ### laws-bite
@@ -39,16 +41,20 @@ shows the law breaking.
 
 - Source: Owner decision 2026-11-19 (the proof-gated development plan, *Laws of the framework
   itself*).
-- Enforced by: test `TestCheckLawsRequiresABreakingWitness`, test `TestBiteRunsAgreedEnforcers`
+- Enforced by: test `TestCheckLawsRequiresABreakingWitness`, test `TestBiteRunsAgreedEnforcers`, test `TestMutationReportsARunWithoutTheTestsResult`
   (every machine law carries a witness: a mutation of an isolated copy of
   the machine on which the law must report a violation, or `CheckLaws`
-  refuses it; every agreed law enforced by a test or a script is rerun with
-  `LAWGATE_BITE=<law>` in a `lawgate_bite` build, which switches its
-  behaviour off through a `bite.Off` hook the enforcing test reaches, and
-  must fail, after a control rerun naming an unrelated law still passes; a
-  script must also print `lawgate: rejects <law>`; lawgate's own hooks use
-  the reserved `lawgate/` prefix; a `Bites: not yet.` gap stays pending
-  with its reason).
+  refuses it; every agreed law enforced by a Go test names its subject, the
+  function it protects, and the gate mutates each guard condition of that
+  subject (negated, comparison flipped, guarded return disabled) through
+  `go test -overlay`: the law's tests must fail on every mutant; each law's
+  proof and subject are pinned in `LAWS.lock`, and CI replays the base
+  commit's proofs against the change; a Node test or a script is rerun with
+  `LAWGATE_BITE=<law>` and must fail after a control rerun naming an
+  unrelated law passes, and a script must print `lawgate: rejects <law>`; a
+  `Subject: not yet.` or `Bites: not yet.` gap stays pending with its
+  reason).
+- Subject: github.com/pantacor/lawgate/machine.checkLaw, github.com/pantacor/lawgate/cmd/lawgate.bitePhase.judge, github.com/pantacor/lawgate/cmd/lawgate.bitePhase.checkGoLaw, github.com/pantacor/lawgate/cmd/lawgate.bitePhase.checkLaw, github.com/pantacor/lawgate/mutate.Target.Mutants
 - Status: agreed 2026-11-19
 
 ## Machines at run time
@@ -62,6 +68,7 @@ the machine, is refused with an error the caller must surface.
 - Source: Owner decision 2026-11-19 (the proof-gated development plan, *Laws of the framework
   itself*).
 - Enforced by: test `TestGoChecksContinuity`, test `TestIsPathRefusesBrokenTraces`, test `TestGoRefusesAnEmptyEdgeName`
+- Subject: github.com/pantacor/lawgate/run.cursor.checkContinuity, github.com/pantacor/lawgate/run.checkMoveShape
 - Status: agreed 2026-11-19
 
 ### generated-is-fresh
@@ -74,6 +81,7 @@ No generated state type differs from the declaration it came from.
   (`gen.ReportCheck` regenerates in memory and reports each target fresh,
   stale or missing; `lawgate check` runs each module's `generate_check`,
   records those verdicts, and fails a generated file no target covers).
+- Subject: github.com/pantacor/lawgate/gen.targetStatus, github.com/pantacor/lawgate/cmd/lawgate.generationCheck.run
 - Status: agreed 2026-11-19
 
 ## Code
@@ -89,4 +97,5 @@ parameter. lawgate itself has zero findings and an empty baseline.
 - Source: Owner decision 2026-11-20 ("I want to be able to read the laws
   code easily: no deep indentation, no objects inside objects inline").
 - Enforced by: test `TestCoreFollowsTheReadabilityRule`
+- Subject: github.com/pantacor/lawgate/readability.CheckFile
 - Status: agreed 2026-11-20

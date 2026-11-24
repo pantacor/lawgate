@@ -35,6 +35,31 @@ func TestCheckReportsEachProblem(t *testing.T) {
 	requireProblem(t, twice, in, "has more than one section")
 	noSource := "### first-law\n\n- Enforced by: machine `worker`\n- Status: " + agreed + "\n"
 	requireProblem(t, noSource, in, `has no "- Source:" line`)
+	requireSourceChecks(t, in)
+}
+
+// requireSourceChecks covers each way a Source is refused, and the cited
+// forms it accepts, for laws-have-a-source.
+func requireSourceChecks(t *testing.T, in Inputs) {
+	t.Helper()
+	refused := map[string]string{
+		"my memory":                     "has invalid Source",
+		"my memory (agreed 2026-11-20)": "has invalid Source",
+		"https://example.test/plan (agreed 2026-02-30)": "has invalid Source",
+		"owner decision 2026-02-30":                     "not a valid calendar date",
+	}
+	for source, want := range refused {
+		requireProblem(t, withSource(source), in, want)
+	}
+	for _, source := range []string{"https://example.test/plan", "https://example.test/plan (agreed 2026-11-20)"} {
+		if got := checkText(withSource(source), in); got != "" {
+			t.Errorf("Source %q: want no problem, got:\n%s", source, got)
+		}
+	}
+}
+
+func withSource(source string) string {
+	return "### first-law\n\n- Source: " + source + "\n- Enforced by: machine `worker`\n- Status: " + agreed + "\n"
 }
 
 func TestCheckAcceptsGapsAndProposals(t *testing.T) {

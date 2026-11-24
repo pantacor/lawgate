@@ -173,27 +173,77 @@ empty and when the input space is empty. Proving nothing is not a pass.
 
 A law bites when its enforcer fails once the protected behaviour is gone. A
 test that passes whatever the code does protects nothing, so the gate checks
-this for every agreed law with a test or script enforcer.
+this for every agreed law. Production code carries no test switch: the gate
+breaks a copy of the code itself.
 
-The code guards the behaviour with a hook:
+A machine law bites through its witness. A law enforced by a Go test bites
+through its subject.
+
+## Subject
+
+The subject is the function a law protects. The law names it in `LAWS.md`:
+
+```markdown
+- Subject: github.com/pantacor/lawgate/example.hasPayload
+```
 
 ```go
-func isValidJob(job Job) bool {
-	hasID := strings.TrimSpace(job.ID) != ""
-	hasPayload := bite.Off("rejects-empty-payload") || strings.TrimSpace(job.Payload) != ""
-	return hasID && hasPayload
+func hasPayload(job Job) bool {
+	return strings.TrimSpace(job.Payload) != ""
 }
 ```
 
-`bite.Off` returns false in an ordinary build. The gate reruns the enforcing
-test twice in a build with the `lawgate_bite` tag:
+Write `<import path>.<Func>` or `<import path>.<Type>.<Method>`. An agreed
+law enforced by a Go test has a subject, or records the gap with
+`Subject: not yet. <why>` and is reported as pending.
 
-1. With `LAWGATE_BITE` set to a law that does not exist. The test must pass.
-   This is the control.
-2. With `LAWGATE_BITE=rejects-empty-payload`. The hook now switches the check
-   off, and the test must fail.
+## Mutation
 
-A machine law does not need a hook. Its witness is its bite.
+A mutant is a copy of the subject with one condition changed. The gate
+makes the mutants. The author does not choose them:
+
+- each `if`, `for` and `switch` case condition is negated;
+- each comparison is flipped (`<` and `<=`, `>` and `>=`, `==` and `!=`);
+- the condition that guards a `return` of an error becomes `false`.
+
+For `hasPayload` the gate turns `!=` into `==`. The law's test must then
+fail. The gate applies each mutant with `go test -overlay`, so the files in
+the repository do not change. A mutant that the test does not catch
+survives, and a surviving mutant fails the `laws-bite` verdict with the
+subject line and the mutation.
+
+## Proof and lock
+
+The proof of a law is its enforcing tests and every test function they call.
+`LAWS.lock` records, for each law, a fingerprint of the proof and a
+fingerprint of the subject. `lawgate lock` writes the file. `lawgate check`
+fails when a fingerprint differs from the lock.
+
+The lock is a rule file. A change to a law's test or subject changes the
+lock, and the owner reviews the lock. So a law's test cannot vouch for
+itself: someone who weakens the code cannot also rewrite the test and merge
+both without the owner.
+
+## Base replay
+
+In CI the gate runs `lawgate check --base <sha>`. For every law agreed at
+the base commit, it takes the base version of the enforcing tests, puts them
+over the candidate code and runs them. The proof the owner approved must
+still pass against the change. A failure names the law. A law the change
+removes or renames also fails, until the owner updates the lock.
+
+```
+base commit:  proof (approved)  +  code
+candidate:    proof (edited?)   +  code (changed)
+replay:       proof from base   +  code from candidate   must pass
+```
+
+## Node tests and scripts
+
+Node tests and scripts have no subject and no mutation yet. The gate reruns
+them with the `LAWGATE_BITE` environment variable set to the law's name,
+and the enforcer must fail. A control rerun with an unrelated name must
+pass. This is a known gap: the enforcer itself decides what to switch off.
 
 ## Rule file
 
@@ -219,7 +269,7 @@ tests, its `testdata/`, its embedded files and its module files.
 ```
 example/worker_test.go            enforces rejects-empty-payload
   └─ example/worker.go            same package, protected
-       └─ lawgate/bite            imported, protected
+       └─ lawgate/gen             imported, protected
 ```
 
 `lawgate codeowners` prints one exact CODEOWNERS entry for each file in the
@@ -251,5 +301,5 @@ laws.
 
 Pending means a law waits on a decision. It is not a pass and not a failure.
 A law is pending when it records a gap with `Enforced by: not yet. <why>` or
-`Bites: not yet. <why>`. Reports list pending items under their own heading,
+`Subject: not yet. <why>` or `Bites: not yet. <why>`. Reports list pending items under their own heading,
 each with its reason.

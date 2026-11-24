@@ -23,7 +23,8 @@ reference.
    declare laws in `machine.Machine`, bind sites with `resolve`, and call
    `runner.Main` from `./cmd/machine` (see `example/` and the machine-runner
    contract below). Name each test's law in its doc comment or a string in its
-   body.
+   body, and name the function each Go test law protects in a `Subject:`
+   line. Run `lawgate lock` and commit `LAWS.lock`.
 4. Run `lawgate check`. For existing readability findings you intend to
    ratchet down, run `lawgate readability-baseline` and review the counts.
    Tell contributors in `AGENTS.md` to read the relevant laws and run the
@@ -42,7 +43,8 @@ reference.
 | Command | What it does |
 | --- | --- |
 | `init --owner @name [--root DIR] [--platform github\|gitlab] [--fallback]` | Discovers one module for each project `go.mod` and guesses `LAWS.md` beside it. Writes `lawgate.json`, an empty `.lawgate-readability`, a CODEOWNERS block, and the selected pinned CI template. Refuses existing destinations. `--owner` is required; the platform defaults to `github`. `--fallback` starts CODEOWNERS with `* @name` (off by default). |
-| `check [--root DIR] [--out DIR]` | Checks inventory, machines, test execution, and law documentation, then runs configured readability and CODEOWNERS checks. Prints a fresh run directory under `laws-report` by default. The directory holds `laws-summary.md`, `laws-report.html`, and numbered JUnit files for each module and any repository-wide checks. A missing module, crashed runner, or empty report fails the gate. |
+| `check [--root DIR] [--out DIR] [--base REF]` | Checks inventory, machines, test execution, and law documentation, mutates each law's subject, compares proofs and subjects with `LAWS.lock`, then runs configured readability and CODEOWNERS checks. With `--base`, also replays the base ref's proofs against the candidate code. Prints a fresh run directory under `laws-report` by default. The directory holds `laws-summary.md`, `laws-report.html`, and numbered JUnit files for each module and any repository-wide checks. A missing module, crashed runner, or empty report fails the gate. |
+| `lock [--root DIR]` | Writes `LAWS.lock`: for each law, the fingerprint of its proof (the enforcing tests and the test functions they call) and of its subject. `check` fails when either differs from the lock. The lock is a rule file. |
 | `readability-baseline [--root DIR]` | Rewrites the configured baseline from current findings as one `count path` line per offending file. |
 | `rule-files [--root DIR]` | Lists rule files: configuration, the baseline, law documents, gate files, CI files, and the source and tests that declare or enforce rules with everything they reach. A file that cannot be parsed is listed and reported (exit 1). |
 | `codeowners [--root DIR] [--owner @name] [--platform github\|gitlab] [--fallback]` | Prints exact CODEOWNERS entries for the current rule files, after the platform's fallback block with `--fallback`. |
@@ -153,6 +155,7 @@ repository root. Command arguments are arrays of strings run from the module.
 | --- | --- | --- |
 | `modules` | nonempty array of module objects | Required inventory of expected checks. |
 | `product` | string | Optional product name shown in the HTML report. |
+| `lock` | string | Optional path of the proof lock. Defaults to `LAWS.lock`. |
 | `gate_files` | array of strings | Optional extra paths that require rule-file protection. |
 | `owner` | string | Optional required CODEOWNER such as `@name` or `@org/team`. Enables coverage checking and requires `platform`. |
 | `outside_includes` | array of strings | Optional clean absolute directories outside the repository that the owner approves for cgo include directories and headers. Not `/`, the repository root or a directory holding it. Each is noted once instead of reported. |
@@ -213,7 +216,7 @@ Go source and module manifests reached through a symbolic link are refused.
 
 A law uses a level-two or level-three heading with a kebab-case name. Other
 headings group sections. A name under the `lawgate/` prefix is refused: the
-prefix is reserved for lawgate's own bite selectors. Write the rule and its owner-approved source.
+prefix is reserved for lawgate's own control selectors. Write the rule and its owner-approved source.
 
 ```markdown
 ### law-name
@@ -223,7 +226,8 @@ One sentence describing the rule.
 - Source: <repository path, URL, or owner decision YYYY-MM-DD>
 - Enforced by: machine `worker` | test `TestName` or `import/path/TestName` | script `path` | not yet. <why> | proposed
 - Status: agreed <YYYY-MM-DD> | proposed
-- Bites: not yet. <why> (optional for a test or script enforcer)
+- Subject: <import path>.<Func> | not yet. <why> (an agreed law enforced by a Go test)
+- Bites: not yet. <why> (optional for a Node test or script enforcer)
 ```
 
 Identify the source with a repository path, URL, or explicit
@@ -237,67 +241,139 @@ build, name the law, and ran to completion. Node checks the three fields and
 looks for each named test in the TAP results. `Enforced by: not yet. <why>`
 reports an agreed law as pending with its reason. `Law.Pending` is the reason
 a verdict waits on a decision instead of failing: a machine-law violation
-under owner review, a recorded enforcement or bite gap, or an enforcing test
+under owner review, a recorded enforcement, subject or bite gap, or an enforcing test
 that did not run. Reports list these under their own "Pending" heading.
 Shared documents use the adopting module's machine and test evidence. A law
 should have a single section across that module's primary and shared documents.
 
 ## Making a law bite
 
-An agreed law with a test or script enforcer must pass normally, pass a
-control with an unrelated selector, and reject the mutation selected by
-`LAWGATE_BITE`. Put a literal `bite.Off("<law-name>")` call in the module's
-non-test Go code and have the test assert the behavior the call disables.
+A law bites when its enforcer fails once the protected behaviour is gone.
+Production code carries no test switch: lawgate breaks the code itself, in a
+copy, and pins the proof so that a change cannot rewrite the test that
+judges it.
+
+### Subject and mutation (Go tests)
+
+An agreed law enforced by a Go test names the function it protects:
+
+```markdown
+- Subject: example.com/shop/wallet.Withdraw
+```
+
+Write `<import path>.<Func>` or `<import path>.<Type>.<Method>`. The
+function must be in the law's module. For each subject, lawgate generates
+mutants and runs the law's enforcing tests against each one:
+
+- it negates each `if`, `for` and `switch` case condition;
+- it flips each comparison (`<` and `<=`, `>` and `>=`, `==` and `!=`);
+- it replaces the condition that guards a `return` of an error by `false`.
+
+Each mutant is a temporary file applied with `go test -overlay`: the
+repository is never edited. The enforcing tests must fail for every mutant.
+A mutant that survives is a failed `laws-bite` verdict that names the
+subject, the line and the mutation: either the test does not exercise that
+condition, or the subject is not the function the law protects. lawgate
+chooses the mutations, so a guard cannot be moved somewhere the test does
+not look.
+
+lawgate runs a bounded number of mutants per subject and reports when it
+truncated the list. Results are cached by the fingerprints of the subject
+and the proof, so an unchanged law is not mutated again.
+
+Keep a subject small: a function that holds the law's guard and little
+else. A subject with unrelated conditions produces mutants the law's test
+has no reason to catch.
 
 ```go
-import "github.com/pantacor/lawgate/bite"
-
-func acceptsPayload(payload string) bool {
-	return bite.Off("rejects-empty-payload") || payload != ""
+// hasPayload is the subject of rejects-empty-payload.
+func hasPayload(job Job) bool {
+	return strings.TrimSpace(job.Payload) != ""
 }
 ```
 
-The corresponding test asserts that an empty payload is rejected. The
-hook must be in a file selected in the enforcing test package's tagged
-import closure. The check establishes that the file is available to the
-test package. The test itself must exercise the guarded behavior.
+When a law has no subject yet, record the gap. It is reported as pending
+with its reason, never as a pass:
 
-Lawgate isolates the named Go test and adds `lawgate_bite` to the configured
-Go tags. It carries the configured environment prefix, `-C`, build and test
-flags such as `-race`, `-short` and `-timeout`, and any `-args` arguments.
-It drops the flags that write files (`-coverprofile` and the other profiles,
-`-trace`, `-outputdir`): a rerun is a probe, and never replaces what the
-configured command wrote. The isolated command must pass with an unrelated
-selector before lawgate selects the mutation. When that control fails,
-lawgate reruns it with an empty selector, to report whether the tagged build
-fails on its own or the enforcer rejects every selection. `bite.Off` returns
-false in ordinary builds. The lawgate CLI reserves `LAWGATE_BITE` for enforcer
-subprocesses and refuses to start when the variable is set. Adopter selectors
-are the bare law names. The `lawgate/` prefix is reserved for framework hooks
-and control selectors; lawgate knows its own tests by the module path its
-`go.mod` declares. That path comes from the binary's Go build information: a
-binary built without it (not by the go command in module mode) reports one
-infrastructure error and checks no Go bite.
+```markdown
+- Subject: not yet. The check lives in a generated file.
+```
 
-Node and script enforcers read `LAWGATE_BITE` directly. Match the exact law
-name so the unrelated control passes. For a Node enforcer, the named TAP
-test must fail. When the test command starts `node --test` directly (the
-default), lawgate adds `--test-name-pattern` with the enforcer's name, so
-each rerun runs only the tests whose name contains it. Any other runner,
-such as `npm test` or a script, reruns its whole suite twice per law. Node
-matches the pattern against each test's own name, so it skips a `test()`
-nested in a parent `test()` whose name does not match (a `describe` suite
-always runs). When a narrowed rerun has no result for the enforcer, lawgate
-reruns the whole test command once; if the test is still absent, the bite
-fails with "did not run". A script exits 0 on a passing check. When its assertion
-rejects the mutation, it prints the exact line `lawgate: rejects <law>` to
-stdout or stderr and exits 1. Other nonzero exits, including exit 1 without
-that line, are infrastructure failures. Keep the mutation local to the rerun.
+### The lock (`LAWS.lock`)
 
-If an agreed law has a test or script enforcer and its mutation is still
-pending, add `- Bites: not yet. <why>` to report each affected bite as pending
-with its reason.
-Machine laws demonstrate a bite with their declared witness.
+`lawgate lock` writes `LAWS.lock` at the repository root (or the path in the
+`lock` field of `lawgate.json`). For each law it records two SHA-256
+fingerprints:
+
+- the proof: the source of each enforcing test function and of every
+  function in the module's test files it calls;
+- the subject: the source of the subject function.
+
+Both are normalised by the Go printer, so formatting does not change them.
+`lawgate check` recomputes them and fails when one differs from the lock:
+
+```
+proof of rejects-empty-payload changed: update LAWS.lock, which needs the owner's review
+```
+
+`LAWS.lock` is a rule file, so the owner reviews every change to it through
+CODEOWNERS. Editing a law's test or its subject therefore needs the owner,
+even when the gate would otherwise pass.
+
+### Base replay (CI)
+
+`lawgate check --base <sha>` replays the approved proofs against the
+change. For every law agreed at the base commit, lawgate takes the base
+version of the enforcing test files and the base `LAWS.lock`, overlays them
+on the candidate tree and runs the named tests against the candidate's
+production code. A failure names the law:
+
+```
+the approved proof of rejects-empty-payload fails against this change
+```
+
+A law that was agreed at the base and is removed or renamed by the change
+also fails, until the owner updates the lock. The CI templates pass
+`--base` with the merge base. Run it locally with
+`lawgate check --base origin/main`.
+
+Together the three checks close the loop: mutation shows the proof is not
+vacuous, the lock shows who approved the proof, and base replay shows the
+change still satisfies the proof that was approved.
+
+### Node tests and scripts
+
+Node and script enforcers have no subject and no mutation yet. They keep
+the earlier model: the gate reruns the enforcer with `LAWGATE_BITE` set to
+the law's name, and the enforcer must fail. This is a known gap: the code
+that reads the variable is a test switch the author placed.
+
+The enforcer must pass normally and pass a control rerun with an unrelated
+selector under the reserved `lawgate/` prefix. Match the exact law name so
+the control passes. For a Node enforcer, the named TAP test must fail. When
+the test command starts `node --test` directly (the default), lawgate adds
+`--test-name-pattern` with the enforcer's name, so each rerun runs only the
+tests whose name contains it. Any other runner, such as `npm test` or a
+script, reruns its whole suite twice per law. Node matches the pattern
+against each test's own name, so it skips a `test()` nested in a parent
+`test()` whose name does not match (a `describe` suite always runs). When a
+narrowed rerun has no result for the enforcer, lawgate reruns the whole
+test command once; if the test is still absent, the bite fails with "did
+not run". A script exits 0 on a passing check. When its assertion rejects
+the mutation, it prints the exact line `lawgate: rejects <law>` to stdout
+or stderr and exits 1. Other nonzero exits, including exit 1 without that
+line, are infrastructure failures. Keep the mutation local to the rerun.
+
+The lawgate CLI reserves `LAWGATE_BITE` for these reruns and refuses to
+start when the variable is set. Go code never reads it.
+
+If such a law's breaking case is still pending, add
+`- Bites: not yet. <why>` to report it as pending with its reason.
+
+### Machine laws
+
+A machine law demonstrates a bite with its declared witness. It needs no
+subject.
 
 ## Generated Go source
 
@@ -349,12 +425,44 @@ without machine runners are scanned under the default build.
 Running `cmd/machine -laws` without `-junit` prints a Markdown summary to
 standard output and returns the same `0` / `1` / `2` exit status.
 
+## Review in your editor
+
+`lawgate review` shows, for a branch, what governs each change: the machine
+state and site a line belongs to, the laws that cover it and whether they
+hold, the subject a law protects and the tests that prove it, and the commit
+behind the line. It reads the same `lawgate.json`, `LAWS.md` files and
+machine commands as `lawgate check`, in any adopting repository.
+
+```bash
+lawgate review --base main          # Markdown report (default base: the remote's default branch)
+lawgate review --base main --json   # the same report as JSON
+lawgate review -lsp                 # language server on stdio
+```
+
+The report groups every changed hunk by the states, sites, subjects, tests
+and laws it touches, lists the commits that touch a rule file with their
+approval trailers, and calls out a changed `LAWS.lock` (a proof or subject
+changed: the owner reviews it). The language server gives code lenses
+(`⚙ state`, `◆ site`, `🛡 protected by law`, `🧪 proves law`, each law's
+verdict on its heading), hover, go to definition, diagnostics and the
+`lawgate.review`, `lawgate.reviewMarkdown`, `lawgate.why`, `lawgate.reindex`,
+`lawgate.summary` and `lawgate.index` commands; it re-indexes a second after
+a `.go` file or a `LAWS.md` is saved. The VS Code extension is in
+[`editors/vscode`](editors/vscode/); Neovim and Helix take a few lines of
+configuration.
+
+Machines are read through each module's machine command, run with
+`-index FILE` instead of `-laws -junit FILE`: `runner.Main` writes the
+versioned index (package `review/index`); a custom machine command must
+accept the flag too. See [docs/REVIEW.md](docs/REVIEW.md).
+
 ## Example adopting module
 
 The [`example/`](example/) directory is a minimal Go adopting module showing
 the full end-to-end wiring:
 
-- `example/worker.go` — imperative Go code with tagged failure and write sites.
+- `example/worker.go` — imperative Go code with tagged failure and write
+  sites, and `hasPayload`, the subject of `rejects-empty-payload`.
 - `example/machine.go` — `worker` machine declaration, `resolve.Vocabulary`,
   and two machine laws (`no-silent-errors`, `validate-before-store`) with
   witnesses.
@@ -365,7 +473,8 @@ the full end-to-end wiring:
   from the example module to refresh them.
 - `example/retry_test.go` — uses the generated retry transition and the
   declared load-fault catch to show the per-pass limit in live runs and replay.
-- `example/LAWS.md` — law document naming the machine and test enforcers.
+- `example/LAWS.md` — law document naming the machine and test enforcers and
+  each test law's subject.
 
 In `lawgate.json`, a Go machine module is listed as:
 

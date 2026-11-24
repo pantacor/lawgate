@@ -18,15 +18,14 @@
       <p class="fineprint">Go 1.25, standard library only · Go and Node modules · GitHub and GitLab</p>
     </div>
 
-    {{- /* The four laws of the example module (example/LAWS.md) and what enforces each. */ -}}
+    {{- /* The three laws of the wallet used across this page, and what enforces each. */ -}}
     {{- $laws := slice
-        (dict "name" "no-silent-errors" "by" "machine worker")
-        (dict "name" "validate-before-store" "by" "machine worker")
-        (dict "name" "generated-is-fresh" "by" "test TestWorkerStatesAreFresh")
-        (dict "name" "rejects-empty-payload" "by" "test TestRejectsEmptyPayload") -}}
-    <figure class="gate-card" aria-label="The laws of the example module and their verdicts">
+        (dict "name" "never-spend-more-than-you-have" "by" "test TestNeverSpendMoreThanYouHave")
+        (dict "name" "check-before-charge" "by" "machine checkout")
+        (dict "name" "refunds-never-take-money" "by" "test TestRefundsNeverTakeMoney") -}}
+    <figure class="gate-card" aria-label="The laws of a wallet and their verdicts">
       <figcaption class="gate-head">
-        <span class="mono">example/LAWS.md</span>
+        <span class="mono">LAWS.md</span>
         <span class="arrow" aria-hidden="true">→</span>
         <span class="mono">lawgate check</span>
       </figcaption>
@@ -41,7 +40,7 @@
       </ul>
       <div class="gate-status">
         <span id="gate-phase" class="phase">Passed</span>
-        <span class="mono" id="gate-change">4 laws hold</span>
+        <span class="mono" id="gate-change">3 laws hold</span>
       </div>
     </figure>
   </div>
@@ -62,7 +61,7 @@
       </article>
       <article>
         <h3>A law has to bite</h3>
-        <p>The gate switches the protected behaviour off and reruns the enforcer. If the test still passes, the law fails. A test that cannot fail proves nothing.</p>
+        <p>The gate breaks the protected code on purpose, one condition at a time, and reruns the law's test. If the test still passes, the law fails. A test that cannot fail proves nothing.</p>
       </article>
       <article>
         <h3>Rule changes need the owner</h3>
@@ -93,7 +92,7 @@
       <li>
         <h3><span class="step-n">2</span>Machines</h3>
         <p class="pkg">packages machine, resolve</p>
-        <p>A worker's control flow is declared as data. Laws are checked over that graph, and every declared site is bound to the Go source, so the two cannot drift apart.</p>
+        <p>A flow, such as a checkout, is declared as data: its steps and their order. Laws are checked over that graph, and every declared site is bound to the Go source, so the two cannot drift apart.</p>
       </li>
       <li>
         <h3><span class="step-n">3</span>Typed states</h3>
@@ -112,49 +111,401 @@
 
 <section class="section section-alt" id="examples">
   <div class="wrap">
-    <p class="eyebrow">Examples</p>
+    <p class="eyebrow">See it work</p>
+    <h2 class="section-title">One request. Two outcomes.</h2>
+    <p class="section-lede">How do you trust code that nobody read? You write down what must never happen, and a gate checks it on every change. Here is one rule guarding a wallet.</p>
+
+    <div class="demo" id="demo">
+      <div class="demo-law">
+        <p class="demo-label">The law</p>
+        <p class="demo-claim">You can <b>never spend more</b> than you have.</p>
+        <div class="wallet" role="group" aria-label="The wallet before the change">
+            <p class="wallet-head"><span>Wallet</span><span>starts with $100</span></p>
+            <ul class="jobs">
+              <li><span class="job-payload">Coffee</span><span class="job-amount">−$4</span><span class="job-out">paid</span></li>
+              <li><span class="job-payload">Groceries</span><span class="job-amount">−$60</span><span class="job-out">paid</span></li>
+              <li class="is-declined"><span class="job-payload">Laptop</span><span class="job-amount">−$900</span><span class="job-out">declined</span></li>
+            </ul>
+            <p class="wallet-foot"><span>Balance</span><b>$36</b></p>
+          </div>
+        <p class="demo-caption">So far, it holds. The laptop costs more than the $36 that is left, so it is declined.</p>
+      </div>
+
+      <div class="demo-ask">
+        <p class="demo-label">Then someone asks an AI agent</p>
+        <p class="demo-quote">“Make checkout faster.”</p>
+        <ol class="did">
+          <li><span class="step-n">1</span><p><b>It deletes the balance check.</b> One step less, so checkout is faster.</p></li>
+          <li><span class="step-n">2</span><p><b>A test complains.</b> The agent edits the test until it stops.</p></li>
+          <li><span class="step-n">3</span><p><b>Every test passes.</b> Nothing looks wrong, and nobody reads the change.</p></li>
+        </ol>
+      </div>
+
+      <div class="demo-outcomes">
+        <div class="outcome is-bad">
+          <p class="demo-label">Without lawgate</p>
+          <div class="wallet is-bad" role="group" aria-label="The wallet after the change, without lawgate">
+            <p class="wallet-head"><span>Wallet</span><span>starts with $100</span></p>
+            <ul class="jobs">
+              <li><span class="job-payload">Coffee</span><span class="job-amount">−$4</span><span class="job-out">paid</span></li>
+              <li><span class="job-payload">Groceries</span><span class="job-amount">−$60</span><span class="job-out">paid</span></li>
+              <li class="is-bad"><span class="job-payload">Laptop</span><span class="job-amount">−$900</span><span class="job-out">paid</span></li>
+            </ul>
+            <p class="wallet-foot"><span>Balance</span><b>−$864</b></p>
+          </div>
+          <p class="outcome-line">Tests green. Law broken. <b>The bug ships.</b></p>
+          <p class="outcome-note">Someone with $36 just bought a $900 laptop. You find out later, from the bank.</p>
+        </div>
+        <div class="outcome is-good">
+          <p class="demo-label">With lawgate</p>
+          <div class="wallet" role="group" aria-label="The wallet with lawgate: the change never lands">
+            <p class="wallet-head"><span>Wallet</span><span>starts with $100</span></p>
+            <ul class="jobs">
+              <li><span class="job-payload">Coffee</span><span class="job-amount">−$4</span><span class="job-out">paid</span></li>
+              <li><span class="job-payload">Groceries</span><span class="job-amount">−$60</span><span class="job-out">paid</span></li>
+              <li class="is-declined"><span class="job-payload">Laptop</span><span class="job-amount">−$900</span><span class="job-out">declined</span></li>
+            </ul>
+            <p class="wallet-foot"><span>Balance</span><b>$36</b></p>
+          </div>
+          <p class="refusal"><b>Change refused.</b> The balance check that protects “never spend more than you have” is gone from the code.</p>
+          <p class="outcome-line">Tests green. Law intact. <b>The change is refused.</b></p>
+          <p class="outcome-note">The green tests did not fool the gate. The agent has to put the check back before anything can merge.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="punch"><code>LAWS.md</code> is <code>AGENTS.md</code> with a gate behind it. “Don't break this” is now <em>checked</em>.</p>
+
+    <h3 class="demo-sub">How it works, in plain words</h3>
+    <ol class="steps plain">
+      <li>
+        <h3><span class="step-n">1</span>A person writes the rule</h3>
+        <p>One sentence, in a file called <code>LAWS.md</code>. It says what must never happen. That is the law.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">2</span>A test checks the rule</h3>
+        <p>An ordinary test, which the AI can write. The law names the test that guards it.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">3</span>lawgate checks the test</h3>
+        <p>It breaks the protected code on purpose, in every way it can find, and runs the test again. If the test still passes, the test proves nothing, and the change is refused.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">4</span>The owner guards the law</h3>
+        <p>The law, its test and the code it protects are pinned in <code>LAWS.lock</code> and cannot change without the owner's review. CI also reruns the approved test against every change. An AI cannot quietly rewrite them.</p>
+      </li>
+    </ol>
+
+    <details class="more">
+      <summary>Show me the code behind the wallet</summary>
+      <p class="more-note">The wallet is a small Go module with three laws. It is an illustration and is not in the repository: we built it, ran <code>lawgate check --base main</code> on it, as CI does, and copied the output on this page.</p>
+      <div class="more-body">
+        <div class="trio">
+          <figure class="ex-card">
+            <figcaption><span class="step-n">1</span>The law <span class="mono">LAWS.md</span></figcaption>
+<pre><code>## never-spend-more-than-you-have
+
+No payment is accepted when it is
+larger than the balance.
+
+- Source: owner decision 2026-11-23
+- Enforced by: test
+  `TestNeverSpendMoreThanYouHave`
+- Subject: example.org/shop.Pay
+- Status: agreed 2026-11-23</code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption><span class="step-n">2</span>The code <span class="mono">wallet.go</span></figcaption>
+<pre><code><span class="c">// Plain code: nothing in it is there for the gate.</span>
+func Pay(balance, price int) (int, error) {
+	if price &gt; balance {
+		return balance, decline("SHOP_PAY 1 not enough money")
+	}
+	return take("SHOP_PAY 2 take the money", balance, price)
+}</code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption><span class="step-n">3</span>The test <span class="mono">wallet_test.go</span></figcaption>
+<pre><code><span class="c">// TestNeverSpendMoreThanYouHave enforces
+// never-spend-more-than-you-have.</span>
+func TestNeverSpendMoreThanYouHave(t *testing.T) {
+	left, err := Pay(36, 900)
+	if err == nil {
+		t.Fatalf("paid 900 with 36 in the wallet: balance is now %d", left)
+	}
+	left, err = Pay(36, 36)
+	if err != nil || left != 0 {
+		t.Fatalf("could not spend exactly the balance: %d, %v", left, err)
+	}
+}</code></pre>
+          </figure>
+        </div>
+        <div class="trio">
+          <figure class="ex-card">
+            <figcaption>The agent's change</figcaption>
+<pre><code><span class="c"># wallet.go</span>
+<span class="del">-	if price &gt; balance {</span>
+<span class="del">-		return balance, decline("SHOP_PAY 1 not enough money")</span>
+<span class="del">-	}</span>
+<span class="c"># wallet_test.go</span>
+<span class="del">-	left, err := Pay(36, 900)</span>
+<span class="del">-	if err == nil {</span>
+<span class="add">+	if _, err := Pay(36, 900); err != nil {</span>
+<span class="c"># LAWS.lock, regenerated to match</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>Ordinary CI <span class="mono">go test ./...</span></figcaption>
+<pre><code><span class="ok">ok  	example.org/shop	0.002s</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The gate <span class="mono">lawgate check</span></figcaption>
+<pre><code><span class="no">law checks failed; see laws-report/run-1690343107</span>
+
+### What broke
+
+- `./checkout` could not be checked:
+  <span class="no">check/check-balance: tag "1" (match "")
+  is not in the code</span>
+
+- base proof replay
+  <span class="no">the approved proof of
+  never-spend-more-than-you-have fails
+  against this change</span>
+    wallet_test.go:14: paid 900 with 36
+    in the wallet: balance is now -864</code></pre>
+          </figure>
+        </div>
+      </div>
+    </details>
+
+    <details class="more">
+      <summary>For developers: three ways to get past the law, with the real output of each</summary>
+      <p class="more-note">Same wallet, same law. We made each change and ran the commands. The gate output is trimmed to the lines that matter.</p>
+    <ol class="story">
+      <li>
+        <div class="story-copy">
+          <p class="story-tag is-refused">Attempt 1 · refused</p>
+          <h3>Change the code</h3>
+          <p>The agent deletes the balance check. A wallet with $36 can now pay $900.</p>
+          <p>The law's test fails. Any test suite catches this one. The next two are where ordinary CI stops helping.</p>
+          <p class="story-result is-refused"><strong>The gate refuses the change.</strong> It names the law's test and shows why it failed.</p>
+        </div>
+        <div class="story-code">
+          <figure class="ex-card">
+            <figcaption>The change <span class="mono">wallet.go</span></figcaption>
+<pre><code><span class="del">-	if price &gt; balance {</span>
+<span class="del">-		return balance, decline("SHOP_PAY 1 not enough money")</span>
+<span class="del">-	}</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The gate <span class="mono">lawgate check</span></figcaption>
+<pre><code><span class="no">law checks failed; see laws-report/run-3164626251</span>
+
+### What broke
+
+- `./gate checks` ·
+  `example.org/shop/TestNeverSpendMoreThanYouHave`
+    wallet_test.go:14: paid 900 with 36 in the wallet:
+    balance is now -864
+    <span class="no">--- FAIL: TestNeverSpendMoreThanYouHave (0.00s)</span></code></pre>
+          </figure>
+        </div>
+      </li>
+
+      <li>
+        <div class="story-copy">
+          <p class="story-tag is-refused">Attempt 2 · refused</p>
+          <h3>Change the test too</h3>
+          <p>The agent keeps the broken code and rewrites the test. It now expects the $900 payment to succeed. It even regenerates <code>LAWS.lock</code> so the fingerprints match.</p>
+          <p><code>go test</code> is green. A normal pipeline would merge this.</p>
+          <p>lawgate is not looking at the colour of the test. CI takes the test the owner approved, from the base commit, and runs it against the new code: it fails. The checkout also declares a balance check the code no longer has, and <code>Pay</code> has no condition left that a test could depend on.</p>
+          <p class="story-result is-refused"><strong>The gate refuses the change.</strong> A green test is not enough.</p>
+        </div>
+        <div class="story-code">
+          <figure class="ex-card">
+            <figcaption>The change <span class="mono">wallet_test.go</span></figcaption>
+<pre><code><span class="del">-	left, err := Pay(36, 900)</span>
+<span class="del">-	if err == nil {</span>
+<span class="del">-		t.Fatalf("paid 900 with 36 in the wallet: balance is now %d", left)</span>
+<span class="add">+	if _, err := Pay(36, 900); err != nil {</span>
+<span class="add">+		t.Fatalf("payment failed: %v", err)</span>
+<span class="c"># and: lawgate lock</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>Ordinary CI <span class="mono">go test ./...</span></figcaption>
+<pre><code><span class="ok">ok  	example.org/shop	0.002s</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The gate <span class="mono">lawgate check</span></figcaption>
+<pre><code><span class="no">law checks failed; see laws-report/run-1690343107</span>
+
+### What broke
+
+- `./checkout` could not be checked:
+  <span class="no">check/check-balance: tag "1" (match "") is not in the code</span>
+
+- `./gate checks` · `laws-bite (never-spend-more-than-you-have:
+  LAWS.md, subject example.org/shop.Pay)`
+  <span class="no">subject example.org/shop.Pay (wallet.go:16) has no guard
+  condition to mutate</span>
+
+- `repository/gate checks` · `base proof replay`
+  <span class="no">the approved proof of never-spend-more-than-you-have
+  fails against this change</span>
+    wallet_test.go:14: paid 900 with 36 in the wallet:
+    balance is now -864</code></pre>
+          </figure>
+        </div>
+      </li>
+
+      <li>
+        <div class="story-copy">
+          <p class="story-tag is-refused">Attempt 3 · refused, and needs the owner</p>
+          <h3>Delete the law</h3>
+          <p>The last shortcut is to remove the rule itself from <code>LAWS.md</code>.</p>
+          <p>The gate still refuses. The base commit agreed that law, so removing it needs the owner to allow it in the approved lock first.</p>
+          <p>And even a change that passed every check would wait here. The law document, the lock, the code and the test are rule files. CODEOWNERS names the owner for each one, so the platform will not merge the change without the owner's review.</p>
+          <p class="story-result is-refused"><strong>Refused, and waiting for the owner.</strong> The audit shows exactly which rule files the change touched.</p>
+        </div>
+        <div class="story-code">
+          <figure class="ex-card">
+            <figcaption>The change <span class="mono">LAWS.md</span></figcaption>
+<pre><code><span class="del">-## never-spend-more-than-you-have</span>
+<span class="del">-</span>
+<span class="del">-No payment is accepted when it is larger than the balance.</span>
+<span class="del">-</span>
+<span class="del">-- Source: owner decision 2026-11-23</span>
+<span class="del">-- Enforced by: test `TestNeverSpendMoreThanYouHave`</span>
+<span class="del">-- Subject: example.org/shop.Pay</span>
+<span class="del">-- Status: agreed 2026-11-23</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The gate <span class="mono">lawgate check</span></figcaption>
+<pre><code><span class="no">law checks failed; see laws-report/run-2817410596</span>
+
+### What broke
+
+- `repository/gate checks` · `base proof replay`
+  <span class="no">agreed law never-spend-more-than-you-have (., LAWS.md)
+  was removed or renamed; the owner must first allow
+  removal in the base proof lock</span></code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The audit <span class="mono">lawgate rule-changes BASE HEAD</span></figcaption>
+<pre><code>a22c6a42064db4c530e4303e0fc92c7e09ae46be
+  Rule-change-approved-by (audit): "(none)"
+  rule file: "LAWS.lock"
+  rule file: "LAWS.md"</code></pre>
+          </figure>
+          <figure class="ex-card">
+            <figcaption>The owner <span class="mono">.github/CODEOWNERS</span></figcaption>
+<pre><code>/LAWS.lock @your-org/law-owners
+/LAWS.md @your-org/law-owners
+/wallet.go @your-org/law-owners
+/wallet_test.go @your-org/law-owners</code></pre>
+          </figure>
+        </div>
+      </li>
+    </ol>
+    </details>
+  </div>
+</section>
+
+<section class="section" id="kinds">
+  <div class="wrap">
+    <p class="eyebrow">Three kinds of law</p>
     <h2 class="section-title">A law, its code and its proof.</h2>
-    <p class="section-lede">Every law has three parts. A person writes the sentence in <code>LAWS.md</code>. Code checks it. The gate then demands proof that the check can fail. Here are the three kinds of law.</p>
+    <p class="section-lede">The wallet has three laws, one of each kind. Each has the same three parts: a sentence in <code>LAWS.md</code>, code that checks it, and proof that the check can fail.</p>
 
     <div class="ex">
       <div class="tabs" role="tablist" aria-label="Kind of law">
-        <button type="button" role="tab" id="tab-machine" aria-controls="panel-machine" aria-selected="true" data-tab="machine">Machine law</button>
-        <button type="button" role="tab" id="tab-test" aria-controls="panel-test" aria-selected="false" data-tab="test">Test law</button>
+        <button type="button" role="tab" id="tab-test" aria-controls="panel-test" aria-selected="true" data-tab="test">Test law</button>
+        <button type="button" role="tab" id="tab-machine" aria-controls="panel-machine" aria-selected="false" data-tab="machine">Machine law</button>
         <button type="button" role="tab" id="tab-kernel" aria-controls="panel-kernel" aria-selected="false" data-tab="kernel">Kernel law</button>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" data-tab="test">
+        <h3 class="panel-title">Test law</h3>
+        <p class="ex-note">One case, checked by a test. This is the law from the demo above: you can never spend more than you have.</p>
+        <div class="ex-grid">
+          <figure class="ex-card ex-law">
+            <figcaption><span class="step-n">1</span>The law <span class="mono">LAWS.md</span></figcaption>
+<pre><code>## never-spend-more-than-you-have
+
+No payment is accepted when it is
+larger than the balance.
+
+- Source: owner decision 2026-11-23
+- Enforced by: test
+  `TestNeverSpendMoreThanYouHave`
+- Subject: example.org/shop.Pay
+- Status: agreed 2026-11-23</code></pre>
+          </figure>
+          <figure class="ex-card ex-code">
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">wallet.go, wallet_test.go</span></figcaption>
+<pre><code><span class="c">// The subject: plain code, no hooks.</span>
+func Pay(balance, price int) (int, error) {
+	if price &gt; balance {
+		return balance, decline("SHOP_PAY 1 not enough money")
+	}
+	return take("SHOP_PAY 2 take the money", balance, price)
+}
+
+<span class="c">// TestNeverSpendMoreThanYouHave enforces never-spend-more-than-you-have.</span>
+func TestNeverSpendMoreThanYouHave(t *testing.T) {
+	left, err := Pay(36, 900)
+	if err == nil {
+		t.Fatalf("paid 900 with 36 in the wallet: balance is now %d", left)
+	}
+	left, err = Pay(36, 36)
+	if err != nil || left != 0 {
+		t.Fatalf("could not spend exactly the balance: %d, %v", left, err)
+	}
+}</code></pre>
+          </figure>
+          <figure class="ex-card ex-proof">
+            <figcaption><span class="step-n">3</span>The proof</figcaption>
+<pre><code><span class="c"># verdicts in the gate's report</span>
+<span class="ok">✓</span> example.org/shop/TestNeverSpendMoreThanYouHave
+<span class="ok">✓</span> laws-bite (never-spend-more-than-you-have:
+  LAWS.md, subject example.org/shop.Pay)
+<span class="ok">✓</span> proof lock
+<span class="ok">✓</span> base proof replay</code></pre>
+            <p>The test ran and names its law. Then the gate made three mutants of <code>Pay</code> (negate <code>price &gt; balance</code>, flip <code>&gt;</code> to <code>&gt;=</code>, skip the decline) and the test failed on each one. Our first version of the test survived the <code>&gt;=</code> mutant: it never paid exactly the balance. The gate refused it until we added that case.</p>
+          </figure>
+        </div>
       </div>
 
       <div class="panel" role="tabpanel" id="panel-machine" aria-labelledby="tab-machine" data-tab="machine">
         <h3 class="panel-title">Machine law</h3>
-        <p class="ex-note">A law over a worker's declared control flow. From <a href="{{ site.Params.repo }}/tree/main/example">the example module</a>.</p>
+        <p class="ex-note">A law about the order of steps. The checkout is declared as a small machine: check the balance, then take the money.</p>
         <div class="ex-grid">
           <figure class="ex-card ex-law">
-            <figcaption><span class="step-n">1</span>The law <span class="mono">example/LAWS.md</span></figcaption>
-<pre><code>## validate-before-store
+            <figcaption><span class="step-n">1</span>The law <span class="mono">LAWS.md</span></figcaption>
+<pre><code>## check-before-charge
 
-Every path through the `worker` machine
-validates the job before storing the
-completed result.
+Every path through the `checkout`
+machine checks the balance before it
+takes the money.
 
-- Source: `../README.md`, *Example adopting
-  module* (agreed 2026-11-20).
-- Enforced by: machine `worker`
-- Status: agreed 2026-11-20</code></pre>
+- Source: owner decision 2026-11-23
+- Enforced by: machine `checkout`
+- Status: agreed 2026-11-23</code></pre>
           </figure>
           <figure class="ex-card ex-code">
-            <figcaption><span class="step-n">2</span>The laws code <span class="mono">example/machine.go</span></figcaption>
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">machine.go</span></figcaption>
 <pre><code>machine.Law{
-	Name: "validate-before-store",
+	Name: "check-before-charge",
 	<span class="c">// Check reads the declared graph.</span>
 	Check: func(m *machine.Machine) []string {
-		if m.AlwaysBefore("validate-input", "store-done") {
+		if m.AlwaysBefore("check-balance", "take-money") {
 			return nil
 		}
-		return []string{"step validate-input does not always precede store-done"}
+		return []string{"step check-balance does not always precede take-money"}
 	},
-	<span class="c">// Witness adds an edge that skips validation.</span>
+	<span class="c">// Witness removes the balance check from a copy.</span>
 	Witness: func(m *machine.Machine) {
-		bypass := machine.Edge{On: "skip", To: "complete", Kind: machine.EdgeNext}
-		m.States[0].Edges = append(m.States[0].Edges, bypass)
+		m.States[0].Steps = nil
 	},
 }</code></pre>
           </figure>
@@ -163,103 +514,65 @@ completed result.
 <pre><code><span class="p">$</span> go run ./cmd/machine -laws
 ## Laws
 
-<span class="ok">✓ 1 machine, 2 laws hold.</span></code></pre>
-            <p>The law holds on the real machine. The gate also applies the witness to a copy, and the law must report a violation there. A law with no witness, or a witness that breaks nothing, is refused.</p>
-          </figure>
-        </div>
-      </div>
-
-      <div class="panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" data-tab="test">
-        <h3 class="panel-title">Test law</h3>
-        <p class="ex-note">A law enforced by a test, with a hook that lets the gate switch the behaviour off. From <a href="{{ site.Params.repo }}/tree/main/example">the example module</a>.</p>
-        <div class="ex-grid">
-          <figure class="ex-card ex-law">
-            <figcaption><span class="step-n">1</span>The law <span class="mono">example/LAWS.md</span></figcaption>
-<pre><code>## rejects-empty-payload
-
-Processing a job with an empty payload
-fails before writing a completed result.
-
-- Source: `../README.md`, *Example adopting
-  module* (agreed 2026-11-20).
-- Enforced by: test `TestRejectsEmptyPayload`
-- Status: agreed 2026-11-20</code></pre>
-          </figure>
-          <figure class="ex-card ex-code">
-            <figcaption><span class="step-n">2</span>The laws code <span class="mono">worker.go, worker_test.go</span></figcaption>
-<pre><code><span class="c">// The behaviour, guarded by a bite hook.</span>
-func isValidJob(job Job) bool {
-	hasID := strings.TrimSpace(job.ID) != ""
-	hasPayload := bite.Off("rejects-empty-payload") || strings.TrimSpace(job.Payload) != ""
-	return hasID &amp;&amp; hasPayload
-}
-
-<span class="c">// TestRejectsEmptyPayload enforces rejects-empty-payload.</span>
-func TestRejectsEmptyPayload(t *testing.T) {
-	job := Job{ID: "job-1", Payload: "   "}
-	store := &amp;memoryStore{job: job}
-	if err := Process("job-1", store); err == nil {
-		t.Fatal("expected error for empty payload, got nil")
-	}
-	if store.stored != 0 {
-		t.Fatalf("StoreDone called %d times, want 0", store.stored)
-	}
-}</code></pre>
-          </figure>
-          <figure class="ex-card ex-proof">
-            <figcaption><span class="step-n">3</span>The proof</figcaption>
-<pre><code><span class="c"># verdicts in the gate's report</span>
-<span class="ok">✓</span> example/TestRejectsEmptyPayload
-<span class="ok">✓</span> laws-bite (rejects-empty-payload:
-  example/LAWS.md, TestRejectsEmptyPayload)</code></pre>
-            <p>The test ran and names its law. Then the gate reran it twice in a <code>lawgate_bite</code> build: once selecting a law that does not exist, where it must pass, and once with <code>LAWGATE_BITE=rejects-empty-payload</code>, where it must fail.</p>
+<span class="ok">✓ 1 machine, 1 law hold.</span></code></pre>
+            <p>The law holds on the real checkout. The gate also applies the witness to a copy, and the law must report a violation there. It also checks that each declared step is really in <code>wallet.go</code>, which is how it noticed the deleted balance check.</p>
           </figure>
         </div>
       </div>
 
       <div class="panel" role="tabpanel" id="panel-kernel" aria-labelledby="tab-kernel" data-tab="kernel">
         <h3 class="panel-title">Kernel law</h3>
-        <p class="ex-note">A law about a small pure function, checked on every input inside declared bounds. An illustration: this kernel is not in the example module.</p>
+        <p class="ex-note">A law about a small pure function, checked on every input inside declared bounds. Here: a refund can never take money away.</p>
         <div class="ex-grid">
           <figure class="ex-card ex-law">
             <figcaption><span class="step-n">1</span>The law <span class="mono">LAWS.md</span></figcaption>
-<pre><code>## revisions-only-grow
+<pre><code>## refunds-never-take-money
 
-No revision number is lower than or equal
-to the one before it.
+No refund leaves the balance lower
+than it was, and a valid refund is
+credited in full.
 
-- Source: owner decision 2026-11-20
-- Enforced by: test `TestRevisionsOnlyGrow`
-- Status: agreed 2026-11-20</code></pre>
+- Source: owner decision 2026-11-23
+- Enforced by: test
+  `TestRefundsNeverTakeMoney`
+- Subject: example.org/shop.Refund
+- Status: agreed 2026-11-23</code></pre>
           </figure>
           <figure class="ex-card ex-code">
-            <figcaption><span class="step-n">2</span>The laws code <span class="mono">revision_test.go</span></figcaption>
-<pre><code><span class="c">// TestRevisionsOnlyGrow enforces revisions-only-grow.</span>
-func TestRevisionsOnlyGrow(t *testing.T) {
-	grows := prove.Law[int]{
-		Name: "revisions-only-grow",
-		Holds: func(current int) error {
-			if nextRevision(current) &gt; current {
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">wallet_test.go</span></figcaption>
+<pre><code><span class="c">// TestRefundsNeverTakeMoney enforces refunds-never-take-money.</span>
+func TestRefundsNeverTakeMoney(t *testing.T) {
+	never := prove.Law[prove.Pair[int, int]]{
+		Name: "refunds-never-take-money",
+		Holds: func(in prove.Pair[int, int]) error {
+			after, err := Refund(in.A, in.B)
+			if after &lt; in.A {
+				return fmt.Errorf("balance went from %d to %d", in.A, after)
+			}
+			if in.B &lt; 0 {
 				return nil
 			}
-			return fmt.Errorf("revision %d did not grow", current)
+			if err != nil || after != in.A+in.B {
+				return fmt.Errorf("refund of %d gave %d, %v", in.B, after, err)
+			}
+			return nil
 		},
 	}
-	<span class="c">// The bounds are declared here: 0 to 1000, inclusive.</span>
-	prove.Check(t, prove.Ints(0, 1000), grows)
+	<span class="c">// Every balance from 0 to 100, with every refund from -100 to 100.</span>
+	prove.Check(t, prove.Product(prove.Ints(0, 100), prove.Ints(-100, 100)), never)
 }</code></pre>
           </figure>
           <figure class="ex-card ex-proof">
             <figcaption><span class="step-n">3</span>The proof</figcaption>
-<pre><code><span class="p">$</span> go test -v -run TestRevisionsOnlyGrow
-<span class="ok">prove: 1 laws held on all 1001 inputs</span>
---- PASS: TestRevisionsOnlyGrow (0.00s)</code></pre>
-            <p>Every input in the bounds was checked, so inside them the result is a proof and not a sample. An empty input space or an empty list of laws fails the test. The kernel still needs a <code>bite.Off</code> hook, like any test law.</p>
+<pre><code><span class="p">$</span> go test -v -run TestRefundsNeverTakeMoney
+<span class="ok">prove: 1 laws held on all 20301 inputs</span>
+--- PASS: TestRefundsNeverTakeMoney (0.00s)</code></pre>
+            <p>All 20,301 combinations were checked, so inside those bounds the result is a proof and not a sample. An empty input space or an empty list of laws fails the test. <code>Refund</code> is the law's subject, so the gate mutates it too, like any test law.</p>
           </figure>
         </div>
       </div>
     </div>
-    <p class="foot-note">The <a href="{{ "docs/concepts/" | relURL }}">concepts guide</a> explains witnesses, bites and kernels. The <a href="{{ "docs/user_guide/" | relURL }}#write-lawsmd">user guide</a> has the full <code>LAWS.md</code> format.</p>
+    <p class="foot-note">The wallet module is an illustration and is not in the repository; every output here comes from running lawgate on it. The repository has its own <a href="{{ site.Params.repo }}/tree/main/example">example module</a>. The <a href="{{ "docs/concepts/" | relURL }}">concepts guide</a> explains witnesses, mutation, the lock and kernels.</p>
   </div>
 </section>
 
@@ -275,20 +588,20 @@ func TestRevisionsOnlyGrow(t *testing.T) {
       </div>
     </div>
     <div class="terminal" aria-label="Command-line example">
-      <div class="terminal-bar"><i></i><i></i><i></i><span>lawgate's own gate</span></div>
+      <div class="terminal-bar"><i></i><i></i><i></i><span>the wallet's gate</span></div>
 <pre><code><span class="c"># the command prints the directory of its reports</span>
-<span class="p">$</span> lawgate check --out /tmp/laws
-/tmp/laws/run-1453756126
+<span class="p">$</span> lawgate check
+laws-report/run-3207082631
 
-<span class="p">$</span> cat /tmp/laws/run-1453756126/laws-summary.md
+<span class="p">$</span> cat laws-report/run-3207082631/laws-summary.md
 ## Laws
 
-<span class="ok">✓ All checks passed. 1 machine, 2 machine laws,
-458 gate checks.</span>
+<span class="ok">✓ All checks passed. 1 machine, 1 machine law,
+7 gate checks.</span>
 
-<span class="c"># a change that breaks a law exits 1</span>
-<span class="p">$</span> lawgate check --out /tmp/laws
-<span class="no">law checks failed; see /tmp/laws/run-2071184403</span></code></pre>
+<span class="c"># after the agent deletes the balance check</span>
+<span class="p">$</span> lawgate check
+<span class="no">law checks failed; see laws-report/run-2224838546</span></code></pre>
     </div>
   </div>
 </section>
@@ -335,13 +648,13 @@ func TestRevisionsOnlyGrow(t *testing.T) {
         </div>
         <div class="quick-code">
           <div class="copy-block">
-<pre><code id="cmd-law">### rejects-empty-payload
+<pre><code id="cmd-law">## never-spend-more-than-you-have
 
-Processing a job with an empty payload fails.
+No payment is accepted when it is larger than the balance.
 
-- Source: owner decision 2026-11-20
-- Enforced by: test `TestRejectsEmptyPayload`
-- Status: agreed 2026-11-20</code></pre>
+- Source: owner decision 2026-11-23
+- Enforced by: test `TestNeverSpendMoreThanYouHave`
+- Status: agreed 2026-11-23</code></pre>
             <button type="button" class="copy" data-copy="cmd-law">Copy</button>
           </div>
         </div>

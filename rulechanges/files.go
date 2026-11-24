@@ -258,6 +258,9 @@ func (inputs *ruleInputs) loadConfig(tree sourceTree, rules map[string]bool) err
 	if err != nil {
 		return err
 	}
+	if config.Lock != "" {
+		rules[config.LockPath()] = true
+	}
 	inputs.words.addAll(config.RulePackages)
 	problems := []error{inputs.approveOutsideIncludes(tree, config)}
 	if config.Readability != nil {
@@ -338,7 +341,7 @@ func platformRuleFile(name string) bool {
 
 func fixedRuleFile(name string) bool {
 	switch path.Base(name) {
-	case "LAWS.md", "CODEOWNERS":
+	case "LAWS.md", "CODEOWNERS", inventory.DefaultLock:
 		return true
 	}
 	return name == "Makefile" || name == inventory.Filename

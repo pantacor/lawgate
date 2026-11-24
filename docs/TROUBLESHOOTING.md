@@ -63,7 +63,7 @@ Remove the copy.
 
 ### `law <name> uses the reserved "lawgate/" prefix`
 
-Rename the law. lawgate keeps that prefix for its own bite selectors.
+Rename the law. lawgate keeps that prefix for its own control selectors.
 
 ## Test enforcers
 
@@ -104,29 +104,68 @@ keep the default format: `go test -json` for Go, TAP for Node.
 
 ## Bites
 
-### `bite hook missing in reachable non-test Go code: add bite.Off("<law>") or document a bite gap`
+### `mutant survived: <subject> line <n>: <mutation>`
 
-The law has a test enforcer, but no `bite.Off("<law>")` call is in code the
-test package can reach. Add the hook to non-test code in the test's module.
-The name must be a string literal equal to the law's name. If you cannot add
-it yet, record the gap:
+The gate changed one condition of the law's subject and the law's tests
+still passed. Check two things:
+
+- Does the test reach that condition? Add the missing case: assert that the
+  bad input is refused and that a good input is accepted.
+- Is the subject the right function? If it holds conditions the law does not
+  care about, move the law's guard into its own function and name that one.
+
+### `law <name> has no subject`
+
+An agreed law enforced by a Go test must name the function it protects:
 
 ```markdown
-- Bites: not yet. <why>
+- Subject: <import path>.<Func>
 ```
+
+Use `<import path>.<Type>.<Method>` for a method. If you cannot name one
+yet, record the gap and the law is reported as pending:
+
+```markdown
+- Subject: not yet. <why>
+```
+
+### `subject <reference> not found`
+
+The import path, type or function name in the `Subject:` line does not match
+a function in the module. Check the spelling and that the file is part of
+the build.
+
+### `proof of <law> changed: update LAWS.lock, which needs the owner's review`
+
+A test that enforces the law, or a test function it calls, differs from the
+fingerprint in `LAWS.lock`. The message says `subject of <law> changed` when
+the subject function differs. If the change is intended, run `lawgate lock`
+and commit `LAWS.lock` with it. The owner must approve the lock. If it is
+not intended, undo the edit.
+
+### `the approved proof of <law> fails against this change`
+
+`lawgate check --base` ran the law's tests as they were at the base commit
+against your code, and they failed. Your change breaks the behaviour the
+owner approved. Fix the code. If the law itself must change, ask the owner:
+the change needs a new proof and a new lock.
+
+### `law <name> was agreed at the base and is missing`
+
+The change removes or renames a law that was agreed at the base commit. Only
+the owner can do that, by approving the updated `LAWS.lock`.
 
 ### `test TestX passed with LAWGATE_BITE=<law>`
 
-The message can also say `did not fail`. The gate switched the behaviour off
-and the test still passed, so the test does not check the law. Make the test
-assert the behaviour that the hook removes.
+Node tests only. The message can also say `did not fail`. The gate selected
+the law and the test still passed, so the test does not check the law. Make
+the test fail when `LAWGATE_BITE` equals its law name.
 
 ### `test TestX must pass the control with LAWGATE_BITE="lawgate/control/no-such-law"`
 
-The test failed in the control rerun, where no hook is active. Either the
-module does not build with the `lawgate_bite` tag, or the test fails whenever
-`LAWGATE_BITE` is set. A Node test or a script must compare the variable with
-its own law name, not only check that it is set.
+Node tests and scripts only. The enforcer failed in the control rerun, where
+no law is selected. It must compare the variable with its own law name, not
+only check that it is set.
 
 ### `script exited without the required line "lawgate: rejects <law>"`
 

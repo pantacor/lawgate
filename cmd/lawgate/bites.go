@@ -12,14 +12,13 @@ import (
 	"time"
 
 	"github.com/pantacor/lawgate/bite"
-	"github.com/pantacor/lawgate/gosource"
 	"github.com/pantacor/lawgate/inventory"
 	"github.com/pantacor/lawgate/lawsdoc"
+	"github.com/pantacor/lawgate/mutate"
 )
 
 const (
 	biteLawName   = "laws-bite"
-	biteTag       = "lawgate_bite"
 	biteGapPrefix = "bite gap: "
 	testDiscovery = "test discovery"
 )
@@ -29,13 +28,17 @@ type bitePhase struct {
 	module  inventory.Module
 	result  *moduleResult
 	goTests func() (*goBiteInputs, error)
+	cache   mutate.Cache
 }
 
+// mutationCache is where passing mutation runs are remembered.
+var mutationCache = mutate.UserCache
+
 func checkBites(root string, module inventory.Module, result *moduleResult) {
-	if !result.Ready || bite.Off("lawgate/laws-bite") {
+	if !result.Ready {
 		return
 	}
-	phase := bitePhase{root: root, module: module, result: result}
+	phase := bitePhase{root: root, module: module, result: result, cache: mutationCache()}
 	phase.goTests = syncGoBiteInputs(root, module, result)
 	phase.checkDocument(lawDocument{Path: module.Laws, Plans: result.Plans})
 	for _, doc := range result.SharedDocs {
@@ -43,7 +46,7 @@ func checkBites(root string, module inventory.Module, result *moduleResult) {
 	}
 }
 
-// syncGoBiteInputs discovers tests and hooks once, only if an enforcer needs them.
+// syncGoBiteInputs discovers tests once, only if an enforcer needs them.
 func syncGoBiteInputs(root string, module inventory.Module, result *moduleResult) func() (*goBiteInputs, error) {
 	return sync.OnceValues(func() (*goBiteInputs, error) {
 		if hasDiscoveryFailure(result.Verdicts) {
@@ -61,11 +64,8 @@ func hasDiscoveryFailure(items []verdict) bool {
 }
 
 type goBiteInputs struct {
-	build     inventory.GoCommand
-	tests     lawsdoc.Tests
-	framework string
-	closure   func() ([]gosource.Package, error)
-	hooks     map[hookScope]map[string]bool
+	build inventory.GoCommand
+	tests lawsdoc.Tests
 }
 
 func discoverGoBiteInputs(dir string, command []string, timeout time.Duration) (*goBiteInputs, error) {
@@ -74,25 +74,13 @@ func discoverGoBiteInputs(dir string, command []string, timeout time.Duration) (
 		return nil, err
 	}
 	if build.Subcommand != "test" {
-		return nil, fmt.Errorf("Go bite requires a direct go test command; use env NAME=value go test for Go build settings")
+		return nil, fmt.Errorf("Go mutation requires a direct go test command; use env NAME=value go test for Go build settings")
 	}
 	tests, err := lawsdoc.DiscoverCommandTests(dir, command, timeout)
 	if err != nil {
 		return nil, err
 	}
-	framework, err := frameworkModule()
-	if err != nil {
-		return nil, err
-	}
-	inputs := goBiteInputs{build: build, tests: tests, framework: framework}
-	inputs.hooks = make(map[hookScope]map[string]bool)
-	// One listing serves every test of the module: it does not depend on
-	// the test a rerun selects.
-	tagged := build.SelectTest("", biteTag, build.Operands)
-	inputs.closure = sync.OnceValues(func() ([]gosource.Package, error) {
-		return inventory.GoTestPackages(dir, tagged, timeout)
-	})
-	return &inputs, nil
+	return &goBiteInputs{build: build, tests: tests}, nil
 }
 
 func (phase bitePhase) checkDocument(doc lawDocument) {
@@ -103,13 +91,24 @@ func (phase bitePhase) checkDocument(doc lawDocument) {
 	}
 }
 
+// checkLaw mutates the subject of a Go-test law and reruns every other test
+// or script enforcer with LAWGATE_BITE.
 func (phase bitePhase) checkLaw(doc string, law lawsdoc.LawPlan) {
+	goModule := phase.module.Language == "go"
 	for _, enforcer := range law.Enforcers {
-		if !enforcer.CanBite() {
+		mutated := goModule && enforcer.Kind == lawsdoc.Test
+		if !enforcer.CanBite() || mutated {
 			continue
 		}
 		phase.checkEnforcer(doc, law, enforcer)
 	}
+	if goModule && slices.ContainsFunc(law.Enforcers, isTestEnforcer) {
+		phase.checkGoLaw(doc, law)
+	}
+}
+
+func isTestEnforcer(enforcer lawsdoc.Enforcer) bool {
+	return enforcer.Kind == lawsdoc.Test
 }
 
 type biteCase struct {
@@ -206,13 +205,6 @@ func (phase bitePhase) checkTest(item biteCase) {
 		selector: item.law,
 		whole:    whole,
 	}
-	if phase.module.Language == "go" {
-		resolved, ok := phase.goTarget(item, dir)
-		if !ok {
-			return
-		}
-		target = resolved
-	}
 	if err := phase.result.TestRuns.require(target.name); err != nil {
 		phase.add(verdict{Name: item.name(), Status: failed, Detail: err.Error()})
 		return
@@ -250,18 +242,11 @@ type biteTestTarget struct {
 	// whole is the command without a test selection; it is set only where
 	// command may narrow it.
 	whole []string
-	// tagged marks a Go rerun, which builds with the bite tag and so can
-	// fail before any selector is read.
-	tagged bool
 }
 
 // The unrelated selection catches an enforcer that rejects whenever
-// LAWGATE_BITE is nonempty. The empty selection disables no law: it tells a
-// tagged build that fails on its own from such an enforcer.
-const (
-	noLawControl     = ""
-	unrelatedControl = "lawgate/control/no-such-law"
-)
+// LAWGATE_BITE is nonempty.
+const unrelatedControl = "lawgate/control/no-such-law"
 
 func (phase bitePhase) executeBite(dir string, command []string, selector string) ([]byte, string, error) {
 	overrides := []string{bite.Env + "=" + selector}
@@ -350,8 +335,7 @@ func (phase bitePhase) survivedMutation(run biteRun, target biteTestTarget) stri
 	return withCause(detail, phase.cause(run, target.name))
 }
 
-// passesControl reruns the test with a selector no hook answers to. The empty
-// selection runs only when that fails, to name which of the two broke.
+// passesControl reruns the test with a selector no enforcer answers to.
 // It returns the target the mutation must use: the whole command, when the
 // control's selection skipped the test.
 func (phase bitePhase) passesControl(item biteCase, target biteTestTarget) (biteTestTarget, bool) {
@@ -362,12 +346,6 @@ func (phase bitePhase) passesControl(item biteCase, target biteTestTarget) (bite
 	}
 	if run.passedTest(target.name) {
 		return target, true
-	}
-	if target.tagged {
-		empty := phase.rerun(target, noLawControl)
-		if !empty.passedTest(target.name) {
-			selector, run = noLawControl, empty
-		}
 	}
 	detail := fmt.Sprintf("test %s must pass the control with %s=%q", target.name, bite.Env, selector)
 	cause := phase.cause(run, target.name)

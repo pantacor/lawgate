@@ -1,10 +1,9 @@
-// Package bite lets a law enforcer demonstrate that it detects a violation.
-// Guard the protected behavior with Off, and have the enforcer verify that
-// behavior. The enforcer must pass normally and fail when lawgate reruns it
-// with the lawgate_bite build tag and LAWGATE_BITE selecting the law.
-// The empty selector disables no law. The lawgate/ prefix is reserved for
-// framework laws and control runs.
-// Ordinary Go builds disable Off. Scripts and non-Go code can read
-// the same environment variable directly. Keep the mutation local to the
-// process and leave the repository unchanged.
+// Package bite names the environment variable and the reserved prefix that
+// lawgate uses when it reruns a Node test or a script enforcer to see it
+// fail. Those enforcers read the variable themselves.
+//
+// Go code has no switch here. A law enforced by a Go test names its subject
+// in LAWS.md, and the gate mutates that function in an overlay instead. A
+// hook in production code could be moved to guard something meaningless, so
+// this package offers none.
 package bite

@@ -1,4 +1,4 @@
-# lawgate's own gate. Require both jobs in the branch ruleset, with
+# lawgate's own gate. Require the test and review-rules jobs in the branch ruleset, with
 # code-owner review. The verifier that judges a change is built from the
 # base commit, so a change cannot weaken the checks that review it; a change
 # to lawgate.json that the base verifier cannot read lands in two steps.
@@ -70,7 +70,13 @@ jobs:
         id: laws
         run: |
           status=0
-          directory=$("$RUNNER_TEMP/lawgate" check --out "$RUNNER_TEMP/lawgate-reports") || status=$?
+          # The base decides: a verifier built before proof replay existed
+          # does not know --base.
+          replay=()
+          if [ -f "$RUNNER_TEMP/base/cmd/lawgate/lock_replay.go" ]; then
+            replay=(--base "$LAW_BASE")
+          fi
+          directory=$("$RUNNER_TEMP/lawgate" check "${replay[@]}" --out "$RUNNER_TEMP/lawgate-reports") || status=$?
           printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"
           exit "$status"
       - name: Publish summary
@@ -78,3 +84,25 @@ jobs:
         env:
           REPORT_DIRECTORY: ${{ steps.laws.outputs.directory }}
         run: cat "$REPORT_DIRECTORY/laws-summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+  # The VS Code extension in editors/vscode (npm and Node come with the runner).
+  vscode:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install the pinned dependencies
+        run: npm ci
+      - name: Type-check
+        run: npm run check
+      - name: Package the extension
+        run: npm run package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lawgate.vsix
+          path: editors/vscode/lawgate.vsix
+          if-no-files-found: error

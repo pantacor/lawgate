@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/gen"
 	"github.com/pantacor/lawgate/gosource"
 	"github.com/pantacor/lawgate/inventory"
@@ -76,7 +75,7 @@ func (phase generationCheck) run(generated []string) {
 		}
 		return
 	}
-	if !phase.result.Ready || bite.Off("lawgate/generated-is-fresh") {
+	if !phase.result.Ready {
 		return
 	}
 	stdout, stderr, err := execute(phase.root, phase.module.Path, phase.module.GenerateCheck, phase.module.Timeout())

@@ -9,6 +9,7 @@
 //	- Source: <doc section or dated owner decision>
 //	- Enforced by: machine `<machine-name>` | test `TestName` | script `path` | not yet. <why> | proposed
 //	- Status: agreed <YYYY-MM-DD> | proposed
+//	- Subject: <import path>.<Func> | <import path>.<Type>.<Method> | not yet. <why>
 //	- Bites: not yet. <why> (optional gap for a test or script)
 //
 // "not yet" records a known gap: an agreed law nothing enforces, with the
@@ -19,8 +20,6 @@ package lawsdoc
 import (
 	"regexp"
 	"strings"
-
-	"github.com/pantacor/lawgate/bite"
 )
 
 // FileName is the name of a module's laws file, at the module root.
@@ -32,15 +31,20 @@ const (
 	FieldEnforcedBy = "Enforced by"
 	FieldStatus     = "Status"
 	FieldBites      = "Bites"
+	FieldSubject    = "Subject"
 )
+
+// ReservedPrefix keeps law names free for the framework's own bite
+// selectors (LAWGATE_BITE, read by script and Node enforcers).
+const ReservedPrefix = "lawgate/"
 
 var (
 	lawHeadingRE = regexp.MustCompile("^#{2,3} `?([a-z0-9]+(?:-[a-z0-9]+)*)`?\\s*$")
 	// A heading under the framework's prefix is read as a law so that it
 	// can be refused: as a grouping heading it would pass unnoticed.
-	reservedHeadingRE = regexp.MustCompile("^#{2,3} `?(" + regexp.QuoteMeta(bite.FrameworkPrefix) + "[^`\\s]*)`?\\s*$")
+	reservedHeadingRE = regexp.MustCompile("^#{2,3} `?(" + regexp.QuoteMeta(ReservedPrefix) + "[^`\\s]*)`?\\s*$")
 	headingRE         = regexp.MustCompile(`^#{1,6} `)
-	fields            = []string{FieldSource, FieldEnforcedBy, FieldStatus, FieldBites}
+	fields            = []string{FieldSource, FieldEnforcedBy, FieldStatus, FieldBites, FieldSubject}
 )
 
 // Section is one law of a LAWS.md.
@@ -123,7 +127,7 @@ func lawHeading(line string) []string {
 // Reserved reports whether the law's name is under the prefix the framework
 // keeps for its own bite selectors.
 func (section Section) Reserved() bool {
-	return strings.HasPrefix(section.Name, bite.FrameworkPrefix)
+	return strings.HasPrefix(section.Name, ReservedPrefix)
 }
 
 func (p *docParser) bullet(item string) {
