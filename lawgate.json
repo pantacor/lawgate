@@ -24,5 +24,6 @@
     "baseline": ".lawgate-readability"
   },
   "owner": "@highercomve",
-  "platform": "github"
+  "platform": "github",
+  "require_approval": true
 }
