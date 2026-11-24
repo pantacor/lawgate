@@ -182,3 +182,21 @@ func (literals Literals) preferMachine(machineName string, candidates []Literal)
 	}
 	return candidates[0]
 }
+
+// FindFree is Find over the literals not in claimed. A step id repeats
+// across states, and so can a site's Tag and Match (one call reached from
+// two states): claiming each literal found lets every such site point at
+// its own declaration, in declaration order. When every candidate is
+// claimed it falls back to Find.
+func (literals Literals) FindFree(machineName, tag, match string, claimed map[Literal]bool) (Literal, bool) {
+	free := Literals{machineFiles: literals.machineFiles}
+	for _, site := range literals.Sites {
+		if !claimed[site] {
+			free.Sites = append(free.Sites, site)
+		}
+	}
+	if found, ok := free.Find(machineName, tag, match); ok {
+		return found, true
+	}
+	return literals.Find(machineName, tag, match)
+}

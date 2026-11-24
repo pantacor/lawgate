@@ -80,7 +80,7 @@ func malformedCases() []malformedCase {
 	return []malformedCase{
 		malformed("empty", newMachine(), "has no states"),
 		malformed("duplicate state", duplicateStateMachine(), "state start is declared twice"),
-		malformed("duplicate step", duplicateStepMachine(), "step work is declared in state start and again in other"),
+		malformed("duplicate step", duplicateStepMachine(), "state start declares step work twice"),
 		malformed("catch to unknown", unknownCatchMachine(), "catch on fail goes to unknown state nowhere"),
 		malformed("edge to unknown", newMachine(working("start", next("nowhere"))), "goes to unknown state nowhere"),
 		malformed("unknown entry", unknownEntryMachine(), "entry state ghost is not declared"),
@@ -97,9 +97,20 @@ func duplicateStateMachine() *Machine {
 }
 
 func duplicateStepMachine() *Machine {
+	start := withSteps(working("start", next("done")), step("work"), step("work"))
+	return newMachine(start, terminal("done"))
+}
+
+// A step id names the work, not the place: Fleet's step names come from
+// the Hub API and repeat across states. Validate used to refuse a step id
+// declared in two states.
+func TestValidateAcceptsAStepIDInSeveralStates(t *testing.T) {
 	start := withSteps(working("start", next("other")), step("work"))
 	other := withSteps(working("other", next("done")), step("work"))
-	return newMachine(start, other, terminal("done"))
+	m := newMachine(start, other, terminal("done"))
+	if errs := Validate(m); len(errs) != 0 {
+		t.Fatalf("one step id in two states is well formed:\n%s", errorsText(errs))
+	}
 }
 
 func unknownCatchMachine() *Machine {
@@ -160,5 +171,40 @@ func TestValidateRequiresALimitOnACatchBackIntoItsOwnState(t *testing.T) {
 	m.Catches[0].Limit = 3
 	if errs := Validate(m); len(errs) != 0 {
 		t.Fatalf("a catch back into its own state with a limit is well formed:\n%s", errorsText(errs))
+	}
+}
+
+// carryOnMachine is Fleet's shape: a warn and a silent site whose catches
+// say where the message is logged and leave the pass where it is.
+func carryOnMachine() *Machine {
+	warn := Site{Tag: "1", Kind: SiteWarn, Effect: "noted"}
+	silent := Site{Tag: "2", Kind: SiteSilent}
+	work := withSteps(working("work", next("done")), step("check", warn, silent), step("store"))
+	m := newMachine(work, terminal("done"))
+	logged := Catch{On: SiteWarn, Note: "a warning in the action's log; the action carries on"}
+	swallowed := Catch{On: SiteSilent, Note: "logged and swallowed; the pass carries on"}
+	m.Catches = []Catch{logged, swallowed}
+	return m
+}
+
+// Regression: a catch whose target describes where the message goes, not a
+// state, could only be declared as an unknown state, which Validate refuses.
+func TestValidateAcceptsACatchThatCarriesOn(t *testing.T) {
+	m := carryOnMachine()
+	if errs := Validate(m); len(errs) != 0 {
+		t.Fatalf("a catch with no target carries on and is well formed:\n%s", errorsText(errs))
+	}
+	m.Catches[0].To = "log stream"
+	if got := errorsText(Validate(m)); !strings.Contains(got, "catch on warn goes to unknown state log stream") {
+		t.Fatalf("a catch to a named state that is not declared is refused, got %q", got)
+	}
+}
+
+func TestValidateRefusesALimitOnACatchThatCarriesOn(t *testing.T) {
+	m := carryOnMachine()
+	m.Catches[0].Limit = 2
+	want := "catch on warn carries on, so its limit 2 bounds nothing"
+	if got := errorsText(Validate(m)); !strings.Contains(got, want) {
+		t.Fatalf("want %q, got %q", want, got)
 	}
 }

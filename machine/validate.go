@@ -7,13 +7,16 @@ import "fmt"
 const EntryEdgeName = "enter"
 
 // Validate checks that the declaration is a well-formed graph and returns one
-// error per problem: a machine with no states, duplicate state or step ids, an
-// entry, edge or catch that names an unknown state, a terminal state with
-// edges, a working state with no way out, an edge with a negative limit, two
-// edges of one state with one name, an edge with the reserved entry name,
-// a catch with a negative limit, a catch back into a state that holds its
-// own site kind without a limit, and a state no path from the entry state
-// reaches. Laws assume a valid machine; package resolve runs Validate.
+// error per problem: a machine with no states, a duplicate state id, a step
+// id declared twice in one state (it may repeat in other states: see
+// StepRef), an entry, edge or catch that names an unknown state (a catch
+// with an empty target carries on), a carry-on catch with a limit, a
+// terminal state with edges, a working state with no way out, an edge with
+// a negative limit, two edges of one state with one name, an edge with the
+// reserved entry name, a catch with a negative limit, a catch back into a
+// state that holds its own site kind without a limit, and a state no path
+// from the entry state reaches. Laws assume a valid machine; package
+// resolve runs Validate.
 func Validate(m *Machine) []error {
 	if len(m.States) == 0 {
 		return []error{fmt.Errorf("machine %s has no states", m.Name)}
@@ -31,27 +34,29 @@ func Validate(m *Machine) []error {
 func duplicateIDs(m *Machine) []error {
 	var errs []error
 	states := map[string]bool{}
-	steps := map[string]string{}
 	for _, st := range m.States {
 		if states[st.ID] {
 			errs = append(errs, fmt.Errorf("state %s is declared twice", st.ID))
 		}
 		states[st.ID] = true
-		errs = append(errs, duplicateSteps(st, steps)...)
+		errs = append(errs, duplicateSteps(st)...)
 	}
 	return errs
 }
 
-// duplicateSteps reports the steps of st whose id is already in seen (step id
-// to state id), and adds the rest.
-func duplicateSteps(st State, seen map[string]string) []error {
+// duplicateSteps reports each step id st declares more than once. Only the
+// state is checked: products name steps after the work they do (Fleet's come
+// from the Hub API) and the same work runs in several states, so a step id
+// repeats across states and must not be renamed to look unique. The state
+// and the step id together identify a step.
+func duplicateSteps(st State) []error {
 	var errs []error
+	seen := map[string]bool{}
 	for _, step := range st.Steps {
-		if first, dup := seen[step.ID]; dup {
-			errs = append(errs, fmt.Errorf("step %s is declared in state %s and again in %s", step.ID, first, st.ID))
-			continue
+		if seen[step.ID] {
+			errs = append(errs, fmt.Errorf("state %s declares step %s twice", st.ID, step.ID))
 		}
-		seen[step.ID] = st.ID
+		seen[step.ID] = true
 	}
 	return errs
 }
@@ -62,7 +67,8 @@ func unknownTargets(m *Machine) []error {
 		errs = append(errs, fmt.Errorf("entry state %s is not declared", m.EntryID()))
 	}
 	for _, catch := range m.Catches {
-		if m.State(catch.To) == nil {
+		unknown := !catch.CarriesOn() && m.State(catch.To) == nil
+		if unknown {
 			errs = append(errs, fmt.Errorf("catch on %s goes to unknown state %s", catch.On, catch.To))
 		}
 	}
@@ -97,6 +103,9 @@ func catchLimits(m *Machine) []error {
 func catchShape(m *Machine, catch Catch) []error {
 	if catch.Limit < 0 {
 		return []error{fmt.Errorf("catch on %s has a negative limit %d", catch.On, catch.Limit)}
+	}
+	if catch.CarriesOn() && catch.Limit > 0 {
+		return []error{fmt.Errorf("catch on %s carries on, so its limit %d bounds nothing", catch.On, catch.Limit)}
 	}
 	if catch.Limit == 0 && catchesBackIntoTarget(m, catch) {
 		return []error{fmt.Errorf("catch on %s goes back to %s, which holds a %s site: it needs a limit", catch.On, catch.To, catch.On)}

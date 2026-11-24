@@ -336,3 +336,82 @@ func TestGoRefusesAnEmptyEdgeName(t *testing.T) {
 	unnamed := Transition{From: "start", To: "work"}
 	checkNotPath(t, m, "a move that names no edge", Transition{Edge: EnterEdge, To: "start"}, unnamed)
 }
+
+// closingMachine runs step close in left and in right; only left's close
+// can fault, and a fault waits in retry.
+func closingMachine() *machine.Machine {
+	faulty := machine.Site{Tag: "1", Kind: machine.SiteFault, Effect: "retried"}
+	careful := machine.Site{Tag: "2", Kind: machine.SiteWarn, Effect: "noted"}
+	left := closingState("left", faulty, edge("More", "right"))
+	right := closingState("right", careful, edge("Finish", "done"))
+	retry := machine.State{ID: "retry", Wait: true}
+	done := machine.State{ID: "done", Terminal: true}
+	states := []machine.State{left, right, retry, done}
+	catches := []machine.Catch{{On: machine.SiteFault, To: "retry"}}
+	return &machine.Machine{Name: "m", States: states, Catches: catches}
+}
+
+func closingState(id string, site machine.Site, out machine.Edge) machine.State {
+	sites := []machine.Site{site}
+	steps := []machine.Step{{ID: "close", Kind: "store", Sites: sites}}
+	edges := []machine.Edge{out}
+	return machine.State{ID: id, Steps: steps, Edges: edges}
+}
+
+// A catch move is judged by the occurrence of the step in the state the
+// pass is in, not by the first state that declares the step id.
+func TestCatchFollowsTheStepOccurrenceOfItsState(t *testing.T) {
+	m := closingMachine()
+	if errs := machine.Validate(m); len(errs) != 0 {
+		t.Fatalf("one step id in two states is well formed: %v", errs)
+	}
+	r := quietRun(m)
+	r.Enter("left")
+	if err := r.Go("left", "More", "right"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Catch("right", machine.SiteFault, "retry"); err == nil {
+		t.Fatal("right/close holds no fault site: its fault catch must be drift")
+	}
+	trace := []Transition{{Edge: EnterEdge, To: "left"}, {From: "left", Catch: machine.SiteFault, To: "retry"}}
+	if err := IsPath(m, trace); err != nil {
+		t.Fatalf("left/close holds a fault site, so its catch is a path: %v", err)
+	}
+}
+
+// carryOnMachine runs step close in work, whose warn site is caught by a
+// catch that carries on.
+func carryOnMachine() *machine.Machine {
+	noted := machine.Site{Tag: "1", Kind: machine.SiteWarn, Effect: "noted"}
+	work := closingState("work", noted, edge("Finish", "done"))
+	done := machine.State{ID: "done", Terminal: true}
+	states := []machine.State{work, done}
+	catches := []machine.Catch{{On: machine.SiteWarn, Note: "the job log"}}
+	return &machine.Machine{Name: "m", States: states, Catches: catches}
+}
+
+// A catch that carries on moves nothing: Catch with no target records no
+// transition, yet still refuses one the pass could not take.
+func TestCatchThatCarriesOnRecordsNothing(t *testing.T) {
+	r := quietRun(carryOnMachine())
+	r.Enter("work")
+	if err := r.Catch("work", machine.SiteWarn, ""); err != nil {
+		t.Fatal(err)
+	}
+	unchanged := r.At() == "work" && len(r.Trace) == 1
+	if !unchanged || len(r.Drift) != 0 {
+		t.Fatalf("a carry-on catch changed the run: at %q, trace %v, drift %v", r.At(), r.Trace, r.Drift)
+	}
+	refused := map[string]error{
+		"another state":        r.Catch("done", machine.SiteWarn, ""),
+		"no carry-on declared": r.Catch("work", machine.SiteFault, ""),
+	}
+	for name, err := range refused {
+		if err == nil {
+			t.Errorf("%s: a carry-on catch the pass cannot take must be drift", name)
+		}
+	}
+	if err := quietRun(carryOnMachine()).Catch("work", machine.SiteWarn, ""); err == nil {
+		t.Error("a carry-on catch before the pass starts must be drift")
+	}
+}

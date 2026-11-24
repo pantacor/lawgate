@@ -7,7 +7,7 @@ enableGitInfo = false
   description = "The laws-and-proofs gate from Pantacor. People write the laws of a repository in LAWS.md, and one command, lawgate check, refuses a change that breaks one."
   # The release shown in the install command. Keep it equal to the version the
   # CI templates pin (templates/github-actions.yml, templates/gitlab-ci.yml).
-  version = "latest"
+  version = "v0.1.0"
   repo = "https://github.com/pantacor/lawgate"
   module = "github.com/pantacor/lawgate"
 

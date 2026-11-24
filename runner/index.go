@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/pantacor/lawgate/machine"
-	"github.com/pantacor/lawgate/resolve"
+	"github.com/pantacor/lawgate/render"
 	"github.com/pantacor/lawgate/review/gocode"
 	"github.com/pantacor/lawgate/review/index"
 )
@@ -53,17 +54,13 @@ func indexEntry(root string, entry Entry, literals gocode.Literals) index.Machin
 	}
 	source := entrySource(entry)
 	indexed := index.Machine{Name: entry.Machine.Name, Source: source, Doc: entry.Machine.Doc}
-	if source == "" {
-		indexed.Failure = "machine has no source path"
-		return indexed
-	}
-	src, err := os.ReadFile(sourceFilePath(root, source))
+	b, err := resolveEntry(root, entry)
 	if err != nil {
-		indexed.Failure = fmt.Sprintf("read source %s: %v", source, err)
+		indexed.Failure = err.Error()
 		return indexed
 	}
-	for _, problem := range resolve.Resolve(entry.Machine, src, entry.Vocabulary, entry.Prefix) {
-		indexed.Problems = append(indexed.Problems, sourceProblem(source, problem))
+	if len(b.drift) > 0 {
+		indexed.Problems = b.problems()
 	}
 	laws := combinedLaws(entry.Machine.Laws, entry.Laws)
 	indexed.Laws, err = indexLaws(entry.Machine, laws)
@@ -176,16 +173,41 @@ func containsName(names []string, want string) bool {
 func indexSites(m *machine.Machine, source string, literals gocode.Literals) []index.Site {
 	sites := []index.Site{}
 	file := path.Clean(filepath.ToSlash(source))
+	claimed := map[gocode.Literal]bool{}
 	m.Sites(func(state *machine.State, step *machine.Step, site *machine.Site) {
 		indexed := index.Site{
 			State: state.ID, Status: state.Status, Step: step.ID, StepDoc: step.Doc,
 			Tag: site.Tag, Match: site.Match, Kind: string(site.Kind), Effect: site.Effect,
 			File: file, Line: site.Line, Laws: index.LawRefs(site.Effect, step.Doc),
+			Caught: caughtText(m, site.Kind),
 		}
-		if declared, found := literals.Find(m.Name, site.Tag, site.Match); found {
+		if declared, found := literals.FindFree(m.Name, site.Tag, site.Match, claimed); found {
 			indexed.DeclFile, indexed.DeclLine = declared.File, declared.Line
+			claimed[declared] = true
 		}
 		sites = append(sites, indexed)
 	})
 	return sites
+}
+
+// caughtText says where the catch rules for kind take a failure: each
+// target state, or "carries on (<note>)" for a catch that carries on.
+func caughtText(m *machine.Machine, kind machine.SiteKind) string {
+	var targets []string
+	for _, catch := range m.Catches {
+		if catch.On == kind {
+			targets = append(targets, catchTarget(catch))
+		}
+	}
+	return strings.Join(targets, ", ")
+}
+
+func catchTarget(catch machine.Catch) string {
+	if !catch.CarriesOn() {
+		return catch.To
+	}
+	if catch.Note == "" {
+		return render.CarriesOn
+	}
+	return render.CarriesOn + " (" + catch.Note + ")"
 }

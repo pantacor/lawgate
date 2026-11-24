@@ -53,12 +53,28 @@ func (r *Run) Go(from, edge, to string) error {
 }
 
 // Catch records a declared catch from a state with a site of that kind, as
-// long as its count in this pass is below the catch's declared limit.
+// long as its count in this pass is below the catch's declared limit. With
+// an empty to it is a catch that carries on (machine.Catch): the pass stays
+// in from, so nothing is recorded, but from must still be where the pass
+// is, hold a site of kind, and the machine must declare that carry-on catch.
 func (r *Run) Catch(from string, kind machine.SiteKind, to string) error {
 	if kind == "" {
 		return r.reject(errors.New("catch move has no site kind"))
 	}
+	if to == "" {
+		return r.carryOn(from, kind)
+	}
 	return r.record(Transition{From: from, Catch: kind, To: to})
+}
+
+func (r *Run) carryOn(from string, kind machine.SiteKind) error {
+	if r == nil {
+		return errors.New("cannot check a catch without a run")
+	}
+	if err := r.cursor.carryOn(r.Machine, from, kind); err != nil {
+		return r.reject(err)
+	}
+	return nil
 }
 
 func (r *Run) record(move Transition) error {

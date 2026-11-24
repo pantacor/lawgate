@@ -14,7 +14,7 @@ reference.
 ## Adopt lawgate in a repo in 5 steps
 
 1. Install a pinned release with
-   `go install github.com/pantacor/lawgate/cmd/lawgate@<version>`. Use the same
+   `go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0`. Use the same
    pinned release in CI. From a local checkout, run `go run ./cmd/lawgate`.
 2. Run `lawgate init --platform github --owner @name` (or use `gitlab`).
    Review the discovered Go modules, correct their law document paths, and
@@ -375,6 +375,25 @@ If such a law's breaking case is still pending, add
 A machine law demonstrates a bite with its declared witness. It needs no
 subject.
 
+Package `laws` offers the worker laws products share (`nothing-silent`,
+`every-failure-says-why`, `done-means-stored`, `one-shot-fails-on-fault`,
+and the parameterised `ReachesOneOf`, `NoStuck` and `WaitsEnd`), each with
+a witness; see the [User Guide](docs/USER_GUIDE.md#declare-a-machine-and-its-runner).
+A step is identified by its state and its id: a step id may repeat across
+states, and `AlwaysBefore` and `SomePathBefore` mean every occurrence of an
+id unless a `machine.StepRef` names the state
+([Concepts](docs/CONCEPTS.md#machine)).
+
+A catch with an empty `To` carries on: the pass stays in its state and goes
+on with the next step, and its `Note` says where the error is logged, as in
+`machine.Catch{On: machine.SiteWarn, Note: "the action's log"}`. It is no
+edge of the graph, `run` records no move for it (`Run.Catch(from, kind, "")`
+only checks that the pass can take it), and the outline, the brief and the
+machine index show it as "carries on". `Validate` still refuses a catch to a
+named state that is not declared, and refuses a limit on a carry-on catch.
+`nothing-silent` still reports a silent site whose catch carries on, and
+`one-shot-fails-on-fault` reports a checked kind whose catch carries on.
+
 ## Generated Go source
 
 Lawgate detects the standard `// Code generated ... DO NOT EDIT.` header in
@@ -424,6 +443,15 @@ without machine runners are scanned under the default build.
 
 Running `cmd/machine -laws` without `-junit` prints a Markdown summary to
 standard output and returns the same `0` / `1` / `2` exit status.
+
+`runner.Main` also shows the machines (package `render`): with no action
+flag it prints each machine's outline (`-color` colours it), `-list` lists
+the machines with their state and law counts, `-json` writes one machine,
+its drift, verdicts and source lines as a `runner.MachineView`, and
+`-brief STATE` writes the brief an agent needs to change one state.
+`-machine NAME` narrows any run, `-laws` and `-index` included, to one
+machine. The views exit `0` when shown, `1` when shown over drift, and `2`
+on usage or I/O errors.
 
 ## Review in your editor
 

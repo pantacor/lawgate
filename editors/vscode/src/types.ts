@@ -31,6 +31,7 @@ export interface Site {
   file: string;
   line: number;
   laws?: string[];
+  caught?: string;
   decl_file?: string;
   decl_line?: number;
 }

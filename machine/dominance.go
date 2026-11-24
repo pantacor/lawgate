@@ -15,35 +15,49 @@ type position struct {
 }
 
 // AlwaysBefore reports whether step a runs before step b on EVERY path from
-// the entry state to b. It is false when either step is not declared, when a
-// and b are the same step, and when some path reaches b without passing a.
+// the entry state, where a and b are step ids and each means every
+// occurrence of that id (see StepRef): every occurrence of b is preceded,
+// on every path from the entry state to it, by some occurrence of a. It is
+// AlwaysBeforeRef with no state named.
 func (m *Machine) AlwaysBefore(a, b string) bool {
-	posA, okA := m.stepPosition(a)
-	posB, okB := m.stepPosition(b)
-	twoDistinctSteps := okA && okB && a != b
-	if !twoDistinctSteps {
+	return m.AlwaysBeforeRef(StepRef{Step: a}, StepRef{Step: b})
+}
+
+// AlwaysBeforeRef reports whether some step a names runs before each step b
+// names, on every path from the entry state. It is false when either names
+// no declared step, when a and b are the same reference, and when some path
+// reaches an occurrence of b without passing an occurrence of a first. An
+// occurrence of b that a also names does not precede itself: some other
+// occurrence of a must run before it.
+func (m *Machine) AlwaysBeforeRef(a, b StepRef) bool {
+	before, after := m.positions(a), m.positions(b)
+	declared := len(before) > 0 && len(after) > 0
+	if !declared || a == b {
 		return false
 	}
 	start, ok := m.entryPosition()
 	if !ok {
 		return false
 	}
-	return !m.reachesAvoiding(start, posB, posA)
+	starts := []position{start}
+	return !m.reachesAvoiding(starts, positionSet(after), positionSet(before))
 }
 
-// reachesAvoiding reports whether some path from start reaches goal without
-// passing through avoid.
-func (m *Machine) reachesAvoiding(start, goal, avoid position) bool {
-	seen := map[position]bool{avoid: true}
-	queue := []position{start}
+// reachesAvoiding reports whether some path from one of starts reaches a
+// goal without passing through a position in avoid. A goal is checked
+// before avoid, so reaching a goal that is also in avoid still counts:
+// nothing in avoid ran before it.
+func (m *Machine) reachesAvoiding(starts []position, goals, avoid map[position]bool) bool {
+	seen := map[position]bool{}
+	queue := starts
 	for len(queue) > 0 {
 		at := queue[0]
 		queue = queue[1:]
-		if seen[at] {
-			continue
-		}
-		if at == goal {
+		if goals[at] {
 			return true
+		}
+		if seen[at] || avoid[at] {
+			continue
 		}
 		seen[at] = true
 		queue = append(queue, m.positionsAfter(at)...)
@@ -94,26 +108,6 @@ func (m *Machine) stateIndex(id string) int {
 	for i := range m.States {
 		if m.States[i].ID == id {
 			return i
-		}
-	}
-	return -1
-}
-
-// stepPosition finds the step with id. Step ids are unique in a valid
-// machine (Validate); the first one wins otherwise.
-func (m *Machine) stepPosition(id string) (position, bool) {
-	for i := range m.States {
-		if index := m.States[i].stepIndex(id); index >= 0 {
-			return position{state: i, step: index}, true
-		}
-	}
-	return position{}, false
-}
-
-func (st *State) stepIndex(id string) int {
-	for j := range st.Steps {
-		if st.Steps[j].ID == id {
-			return j
 		}
 	}
 	return -1

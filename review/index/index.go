@@ -75,6 +75,10 @@ type Site struct {
 	File    string   `json:"file"`
 	Line    int      `json:"line,omitempty"` // 0 when resolve could not bind it
 	Laws    []string `json:"laws,omitempty"` // named as "law <name>" in its effect or step
+	// Caught says where the machine's catch rules take a failure of this
+	// site: the target states, or "carries on (<note>)" for a catch that
+	// leaves the pass where it is. Empty when no catch covers its kind.
+	Caught string `json:"caught,omitempty"`
 	// DeclFile and DeclLine point at the site's declaration (its Tag or
 	// Match literal), when it can be found.
 	DeclFile string `json:"decl_file,omitempty"`

@@ -5,7 +5,6 @@
 package runner
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -28,8 +27,11 @@ type Entry struct {
 	Laws       []machine.Law // checked alongside Machine.Laws
 }
 
-// Main runs the standard machine-runner CLI over entries and exits. With
-// -laws:
+// Main runs the standard machine-runner CLI over entries and exits. It
+// does one thing per run, picked by its flags; -machine NAME narrows any of
+// them to one machine.
+//
+// With -laws (and -junit FILE) it checks every law:
 //   - 0 when every machine resolves and every law holds (or is pending),
 //   - 1 when resolution fails or any law breaks (after writing -junit if set),
 //   - 2 on flag, usage, or JUnit I/O errors.
@@ -38,12 +40,19 @@ type Entry struct {
 // lawgate review reads (package review/index) and exits 0 once it is written,
 // whatever the laws' verdicts (they are in the index), or 2 on flag, usage or
 // I/O errors.
+//
+// -list lists the machines with their state and law counts. -json writes one
+// machine as a MachineView, -brief STATE the brief an agent needs to change
+// one state (package render), and with none of these flags it prints each
+// machine's outline (-color colours it). These views exit 0 when shown, 1
+// when shown but the declaration has drifted from its source (the drift is
+// on standard error), and 2 on flag, usage or I/O errors.
 func Main(entries []Entry) {
 	os.Exit(Run(os.Args[1:], entries, os.Stdout, os.Stderr))
 }
 
-// Run parses machine-runner flags from args, checks every entry relative to the
-// current working directory, writes JUnit or Markdown output, and returns the
+// Run parses machine-runner flags from args, runs what they ask for over
+// the entries relative to the current working directory, and returns the
 // process exit status (0, 1, or 2).
 func Run(args []string, entries []Entry, stdout, stderr io.Writer) int {
 	return runIn(".", args, entries, stdout, stderr)
@@ -54,63 +63,45 @@ func runIn(root string, args []string, entries []Entry, stdout, stderr io.Writer
 	if !ok {
 		return 2
 	}
-	if options.index != "" {
-		return indexStatus(writeIndex(root, options.index, entries, stdout), stderr)
+	selected, err := selectEntries(entries, options.machine)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
 	}
-	junitPath := options.junit
-	runs := CheckIn(root, entries)
-	if junitPath != "" {
-		if err := report.WriteJUnit(junitPath, runs); err != nil {
-			fmt.Fprintf(stderr, "write junit %s: %v\n", junitPath, err)
-			return 2
-		}
-		return finishWithJUnit(runs, stderr)
-	}
-	fmt.Fprint(stdout, report.Markdown(runs))
-	return exitStatus(runs)
-}
-
-// runOptions are the runner's flags: -laws with an optional -junit, or
-// -index alone.
-type runOptions struct {
-	laws  bool
-	junit string
-	index string
-}
-
-func parseArgs(args []string, stderr io.Writer) (runOptions, bool) {
-	var options runOptions
-	fs := flag.NewFlagSet("machine", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.BoolVar(&options.laws, "laws", false, "check declared machine laws")
-	fs.StringVar(&options.junit, "junit", "", "write JUnit XML report to file")
-	fs.StringVar(&options.index, "index", "", "write the machine index for lawgate review to `file` (- for stdout)")
-	if err := fs.Parse(args); err != nil {
-		return options, false
-	}
-	if fs.NArg() != 0 {
-		fmt.Fprintln(stderr, "machine runner accepts flags only")
-		return options, false
-	}
-	if problem := options.problem(); problem != "" {
-		fmt.Fprintln(stderr, problem)
-		return options, false
-	}
-	return options, true
-}
-
-// problem says why the flags do not ask for exactly one action.
-func (options runOptions) problem() string {
-	indexing := options.index != ""
+	out := output{root: root, stdout: stdout, stderr: stderr}
 	switch {
-	case indexing && options.laws:
-		return "pass -laws or -index, not both"
-	case indexing && options.junit != "":
-		return "-junit goes with -laws, not -index"
-	case !indexing && !options.laws:
-		return "pass -laws to check machine laws, or -index FILE to write the review index"
+	case options.index != "":
+		return indexStatus(writeIndex(root, options.index, selected, stdout), stderr)
+	case options.laws:
+		return out.laws(options.junit, selected)
+	case options.list:
+		return out.list(selected)
+	case options.json:
+		return out.json(selected)
+	case options.brief != "":
+		return out.brief(options.brief, selected)
 	}
-	return ""
+	return out.outline(options.style(), selected)
+}
+
+// output is where a run writes, and the root its source paths are
+// relative to.
+type output struct {
+	root           string
+	stdout, stderr io.Writer
+}
+
+func (out output) laws(junitPath string, entries []Entry) int {
+	runs := CheckIn(out.root, entries)
+	if junitPath == "" {
+		fmt.Fprint(out.stdout, report.Markdown(runs))
+		return exitStatus(runs)
+	}
+	if err := report.WriteJUnit(junitPath, runs); err != nil {
+		fmt.Fprintf(out.stderr, "write junit %s: %v\n", junitPath, err)
+		return 2
+	}
+	return finishWithJUnit(runs, out.stderr)
 }
 
 func indexStatus(err error, stderr io.Writer) int {

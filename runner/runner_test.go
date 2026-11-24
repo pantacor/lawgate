@@ -89,8 +89,8 @@ func TestRunUsageAndIOErrorsExitTwo(t *testing.T) {
 	entry := sampleEntry(sampleMachine(noSilentLaw()), nil)
 
 	var stdout, stderr bytes.Buffer
-	if code := runIn(dir, nil, []Entry{entry}, &stdout, &stderr); code != 2 {
-		t.Fatalf("missing -laws exit = %d, want 2", code)
+	if code := runIn(dir, []string{"-laws", "-list"}, []Entry{entry}, &stdout, &stderr); code != 2 {
+		t.Fatalf("two actions exit = %d, want 2", code)
 	}
 	if code := runIn(dir, []string{"-laws", "extra"}, []Entry{entry}, &stdout, &stderr); code != 2 {
 		t.Fatalf("positional arg exit = %d, want 2", code)

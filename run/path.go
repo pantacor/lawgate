@@ -142,6 +142,22 @@ func catchLimit(m *machine.Machine, from *machine.State, move Transition) (int, 
 	return catch.Limit, nil
 }
 
+// carryOn checks a catch that carries on from where the pass is. It moves
+// nothing and counts nothing: a carry-on catch has no limit (Validate).
+func (c *cursor) carryOn(m *machine.Machine, from string, kind machine.SiteKind) error {
+	if m == nil {
+		return errors.New("cannot validate a catch without a machine")
+	}
+	if !c.started || from != c.at {
+		return fmt.Errorf("catch on %s carries on in %q but the pass of %s is in %q", kind, from, m.Name, c.at)
+	}
+	_, declared := catchRule(m, kind, "")
+	if !declared || !m.State(from).Holds(kind) {
+		return fmt.Errorf("%s --catch %s--> (carries on) is not declared by %s", from, kind, m.Name)
+	}
+	return nil
+}
+
 // catchRule is the machine's catch rule for a site of kind leading to to.
 func catchRule(m *machine.Machine, kind machine.SiteKind, to string) (machine.Catch, bool) {
 	for _, catch := range m.Catches {

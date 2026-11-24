@@ -209,6 +209,9 @@ func (s *server) siteCard(idx *review.Index, site review.Site, file string, line
 	if site.StepDoc != "" {
 		fmt.Fprintf(&b, "**Step:** %s\n\n", site.StepDoc)
 	}
+	if site.Caught != "" {
+		fmt.Fprintf(&b, "**Caught:** %s\n\n", site.Caught)
+	}
 	if file != "" {
 		fmt.Fprintf(&b, "%s at [%s:%d](%s#L%d)\n\n", label, file, line, s.uri(file), line)
 	}

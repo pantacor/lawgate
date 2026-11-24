@@ -9,7 +9,7 @@ term, see [Concepts](CONCEPTS.md). For a failing gate, see
 lawgate needs Go 1.25 or later. It uses only the standard library.
 
 ```bash
-go install github.com/pantacor/lawgate/cmd/lawgate@latest
+go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0
 ```
 
 Pin a release, and use the same release in CI. From a checkout of lawgate, run
@@ -158,6 +158,43 @@ single test cannot cover. A module with `"machines": true` needs three things.
 Go, and give each machine law a `Check` and a `Witness`. See
 [`example/machine.go`](../example/machine.go).
 
+A catch rule sends every site of one kind to a state. A catch with no
+target carries on instead: the pass stays where it is, and the note says
+where the error is logged.
+
+```go
+catches := []machine.Catch{
+	{On: machine.SiteFault, To: "retry", Note: "the job retries on the ladder"},
+	{On: machine.SiteWarn, Note: "a warning in the job's log; the job carries on"},
+}
+```
+
+A carry-on catch is not an edge, takes no limit, and records no move at run
+time; the runner's outline and brief show it as "carries on".
+
+**Shared worker laws.** Package `laws` has the laws worker products share,
+each with its check and a witness that breaks it, under the names Fleet and
+the Pantavisor AI stack use in their `LAWS.md`. Product facts are
+parameters:
+
+| Constructor | Law |
+| --- | --- |
+| `laws.NothingSilent()` | `nothing-silent`: no site is `silent`. |
+| `laws.EveryFailureSaysWhy(kinds...)` | `every-failure-says-why`: every site of those kinds (default fail, fault, warn) has an `Effect`. |
+| `laws.ReachesOneOf(name, doc, targets...)` | every working state can reach one of the target states. |
+| `laws.NoStuck(name, doc, statuses...)` | every state that is not terminal, waits included, can reach a terminal state (showing one of the statuses). |
+| `laws.WaitsEnd(name, doc, allow...)` | a wait entered on a `no limit` guard names what wakes it. |
+| `laws.DoneMeansStored(done, label)` | every way into the done state leaves a state with a write site labelled `label`. |
+| `laws.OneShotFailsOnFault(label, failed, kinds...)` | on a machine labelled `label`, every caught fault ends in the terminal failed state, and nothing waits. |
+
+```go
+shared := []machine.Law{
+	laws.NothingSilent(),
+	laws.EveryFailureSaysWhy(),
+	laws.DoneMeansStored("done", "stores-done"),
+}
+```
+
 **2. A vocabulary.** It tells lawgate how your code marks a site: the pattern
 of a tag, and which call means which kind of site.
 
@@ -208,6 +245,27 @@ The exit code means:
 | `0` | Every machine resolved and every law holds. |
 | `1` | A law is broken, or the code and the machine have drifted. |
 | other | A usage, flag or I/O error. The gate records an infrastructure failure. |
+
+The runner also shows the machines it declares. Each run does one thing;
+`-machine NAME` narrows it to one machine:
+
+| Flags | Output |
+| --- | --- |
+| (none) | The outline of each machine: catches, states, steps, sites with their lines, edges, findings, and a summary line. `-color` colours it for a terminal. |
+| `-list` | One line per machine: name, source, state count and law count. |
+| `-json` | One machine for a viewer: the declaration with each site's line, `summary`, `drift` (file, line, message), `laws` (verdicts) and the source `lines`. |
+| `-brief STATE` | The Markdown brief an agent needs to change one state: how it is entered, the lines its steps own, the edges and catches it must keep. |
+| `-index FILE` | The machine index `lawgate review` reads. |
+
+`-json` and `-brief` show one machine, so with several declared they need
+`-machine`. These views exit `0` when shown, `1` when shown but the
+declaration has drifted from its source (the drift is on standard error), and
+`2` on a usage or I/O error.
+
+```bash
+go run ./cmd/machine -list
+go run ./cmd/machine -machine worker -brief validate
+```
 
 ### Generated state types
 

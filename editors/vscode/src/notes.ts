@@ -7,7 +7,7 @@ function codes(names: string[]): string {
 }
 
 function siteLines(h: HunkReport): string[] {
-  const sites = (h.sites ?? []).map((s) => `**Site \`${s.tag ?? s.step}\`** · ${s.kind} · \`${s.state}/${s.step}\`${s.effect ? ` — ${s.effect}` : ""}`);
+  const sites = (h.sites ?? []).map((s) => `**Site \`${s.tag ?? s.step}\`** · ${s.kind} · \`${s.state}/${s.step}\`${s.effect ? ` — ${s.effect}` : ""}${s.caught ? ` (caught: ${s.caught})` : ""}`);
   const declarations = (h.declarations ?? []).map((s) => `**Declaration of \`${s.tag ?? s.step}\`** (\`${s.state}/${s.step}\`, resolved at ${s.file}:${s.line})`);
   return [...sites, ...declarations];
 }

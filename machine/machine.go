@@ -69,6 +69,13 @@ type Machine struct {
 
 // Catch is a machine-wide rule for a class of failure: every site of kind On
 // leads to state To.
+//
+// A catch with an empty To carries on: the pass stays where it is and goes
+// on with the next step, and Note says where the error is logged (for
+// example "the action's log", "the pod log only"). It moves the job nowhere,
+// so the graph helpers see no edge for it and package run records no move.
+// Validate refuses a non-empty To that names no state, and a Limit on a
+// carry-on catch, which bounds nothing.
 type Catch struct {
 	On   SiteKind `json:"on"`
 	To   string   `json:"to"`
@@ -79,6 +86,10 @@ type Catch struct {
 	// the caught kind loops, so Validate requires a limit on it.
 	Limit int `json:"limit,omitempty"`
 }
+
+// CarriesOn reports whether the catch leaves the pass where it is: its To is
+// empty.
+func (c Catch) CarriesOn() bool { return c.To == "" }
 
 // State is a phase of a pass. A terminal state ends the job; a wait state
 // ends the pass and parks the job until it is due again.

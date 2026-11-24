@@ -64,7 +64,7 @@ func (w *markdownWriter) hunk(file string, hunk HunkReport) {
 		w.printf("  - states: %s\n", code(hunk.States))
 	}
 	for _, site := range hunk.Sites {
-		w.printf("  - site `%s` (`%s/%s`) %s: %s\n", siteName(site), site.State, site.Step, site.Kind, site.Effect)
+		w.printf("  - site `%s` (`%s/%s`) %s: %s%s\n", siteName(site), site.State, site.Step, site.Kind, site.Effect, caughtNote(site))
 	}
 	for _, site := range hunk.Declarations {
 		w.printf("  - declaration of site `%s` (`%s/%s`, at %s) changed\n", siteName(site), site.State, site.Step, w.link(site.File, site.Line))
@@ -191,4 +191,12 @@ func short(sha string) string {
 func firstParagraph(text string) string {
 	paragraph, _, _ := strings.Cut(strings.TrimSpace(text), "\n\n")
 	return paragraph
+}
+
+// caughtNote is where a site's failure goes, as a hunk's site line ends.
+func caughtNote(site Site) string {
+	if site.Caught == "" {
+		return ""
+	}
+	return " (caught: " + site.Caught + ")"
 }

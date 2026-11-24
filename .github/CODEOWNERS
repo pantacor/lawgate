@@ -87,6 +87,13 @@
 /inventory/outside_includes_test.go @highercomve
 /inventory/rule_packages_test.go @highercomve
 /lawgate.json @highercomve
+/laws/doc.go @highercomve
+/laws/helpers_test.go @highercomve
+/laws/laws_test.go @highercomve
+/laws/lifecycle.go @highercomve
+/laws/reach.go @highercomve
+/laws/sites.go @highercomve
+/laws/witness.go @highercomve
 /lawsdoc/bites_test.go @highercomve
 /lawsdoc/check.go @highercomve
 /lawsdoc/check_test.go @highercomve
@@ -117,6 +124,7 @@
 /machine/laws.go @highercomve
 /machine/laws_test.go @highercomve
 /machine/machine.go @highercomve
+/machine/steps.go @highercomve
 /machine/validate.go @highercomve
 /machine/validate_test.go @highercomve
 /machine/witness.go @highercomve
@@ -139,6 +147,11 @@
 /readability/ratchet.go @highercomve
 /readability/readability.go @highercomve
 /readability/readability_test.go @highercomve
+/render/brief.go @highercomve
+/render/helpers_test.go @highercomve
+/render/render_test.go @highercomve
+/render/summary.go @highercomve
+/render/text.go @highercomve
 /report/gate.go @highercomve
 /report/html.go @highercomve
 /report/html_page.go @highercomve
@@ -152,6 +165,7 @@
 /resolve/resolve.go @highercomve
 /resolve/resolve_test.go @highercomve
 /resolve/scan.go @highercomve
+/resolve/steps_test.go @highercomve
 /review/anchors.go @highercomve
 /review/build.go @highercomve
 /review/build_test.go @highercomve
@@ -239,8 +253,12 @@
 /run/run_test.go @highercomve
 /runner/index.go @highercomve
 /runner/index_test.go @highercomve
+/runner/options.go @highercomve
 /runner/runner.go @highercomve
 /runner/runner_test.go @highercomve
+/runner/steps_test.go @highercomve
+/runner/views.go @highercomve
+/runner/views_test.go @highercomve
 /templates/github-actions.yml @highercomve
 /templates/github.CODEOWNERS @highercomve
 /templates/gitlab-ci.yml @highercomve

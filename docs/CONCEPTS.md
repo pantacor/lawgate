@@ -90,6 +90,26 @@ Check: func(m *machine.Machine) []string {
 },
 ```
 
+A step is identified by its state and its id. A step id may repeat across
+states, because a product names a step after the work it does: Fleet's
+appliance deployer runs `close-open-children` in eleven states, and those
+names come from the Hub API, so they are never renamed. `machine.Validate`
+refuses a step id only when one state declares it twice. The step helpers
+therefore mean every occurrence of an id: `AlwaysBefore(a, b)` holds when
+every occurrence of b is preceded, on every path from the entry state, by
+some occurrence of a (an occurrence never precedes itself), and
+`SomePathBefore(a, b)` holds when some occurrence of a can run before some
+occurrence of b. To mean one occurrence, name its state with a
+`machine.StepRef`:
+
+```go
+check := machine.StepRef{Step: "check-balance"}
+closing := machine.StepRef{State: "refund", Step: "close-account"}
+ok := m.AlwaysBeforeRef(check, closing)
+```
+
+`m.StepIn(state, id)` and `m.StatesWithStep(id)` look steps up the same way.
+
 ### Sites and drift
 
 A site is a place in the code where a failure is reported or a write is made.

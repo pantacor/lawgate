@@ -3,10 +3,13 @@ package machine
 // The graph helpers come in two strengths, and a law must use the one its
 // words need:
 //
-//   - existential ("some path"): Reaches, SomePathBefore. Use them for "can
-//     reach", "is possible".
-//   - universal ("every path"): AlwaysBefore. Use it for "precedes", "only
-//     after", "never without".
+//   - existential ("some path"): Reaches, SomePathBefore(Ref). Use them for
+//     "can reach", "is possible".
+//   - universal ("every path"): AlwaysBefore(Ref). Use it for "precedes",
+//     "only after", "never without".
+//
+// A step id may repeat across states (see StepRef): the step helpers take
+// every occurrence of an id, or the one occurrence a StepRef names.
 //
 // Every walk starts from the entry state (EntryID), never from an arbitrary
 // state, unless a helper takes a start state by name.
@@ -34,11 +37,13 @@ func (m *Machine) Next(st *State) []string {
 	return next
 }
 
-// catchTargets lists where a site of kind leads.
+// catchTargets lists where a site of kind leads. A catch that carries on
+// leads nowhere: the pass stays in its state.
 func (m *Machine) catchTargets(kind SiteKind) []string {
 	var targets []string
 	for _, catch := range m.Catches {
-		if catch.On == kind {
+		moves := catch.On == kind && !catch.CarriesOn()
+		if moves {
 			targets = append(targets, catch.To)
 		}
 	}
@@ -83,24 +88,22 @@ func (m *Machine) walk(start string, stop func(*State) bool) bool {
 	return false
 }
 
-// SomePathBefore reports whether step a can run before step b on SOME path:
-// both in one state with a first, or a's state reaches b's state. It is the
-// existential helper; a law that says "a precedes b" needs AlwaysBefore.
+// SomePathBefore reports whether step a can run before step b on SOME path,
+// where each step id means every occurrence of it (see StepRef). It is
+// SomePathBeforeRef with no state named; a law that says "a precedes b"
+// needs AlwaysBefore.
 func (m *Machine) SomePathBefore(a, b string) bool {
-	posA, okA := m.stepPosition(a)
-	posB, okB := m.stepPosition(b)
-	if !okA || !okB {
-		return false
-	}
-	if posA.state == posB.state && posA.step < posB.step {
-		return true
-	}
-	// Start from the states after a's own, so that a step after b in one
-	// state counts only when a loop comes back to that state.
-	target := m.States[posB.state].ID
-	isTarget := func(st *State) bool { return st.ID == target }
-	for _, next := range m.Next(&m.States[posA.state]) {
-		if m.walk(next, isTarget) {
+	return m.SomePathBeforeRef(StepRef{Step: a}, StepRef{Step: b})
+}
+
+// SomePathBeforeRef reports whether, on some path, a step b names runs after
+// a step a names has run: later in the same state, or after a's position in
+// any state the pass moves on to. A step that comes before a in one state
+// counts only when a loop comes back to it. It is the existential helper.
+func (m *Machine) SomePathBeforeRef(a, b StepRef) bool {
+	goals := positionSet(m.positions(b))
+	for _, from := range m.positions(a) {
+		if m.reachesAvoiding(m.positionsAfter(from), goals, nil) {
 			return true
 		}
 	}
