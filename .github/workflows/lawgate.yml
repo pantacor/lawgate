@@ -6,6 +6,9 @@ name: Law gate
 on:
   pull_request:
   merge_group:
+  # Every change that reaches main is checked again there.
+  push:
+    branches: [main]
 permissions:
   contents: read
 
@@ -28,12 +31,20 @@ jobs:
           test -z "$unformatted" || { printf '%s\n' "$unformatted"; exit 1; }
           go vet ./...
           go test -race -count=1 ./...
+      - name: Test the example module
+        working-directory: example
+        run: |
+          go vet ./...
+          go test -race -count=1 ./...
 
   review-rules:
     runs-on: ubuntu-latest
     env:
-      LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-      LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      # On a push to main the base is the commit before the push; the first
+      # push of the branch has none, so the verifier is built from the pushed
+      # commit and there is no history to audit.
+      LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+      LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -45,6 +56,10 @@ jobs:
           cache: false
       - name: Build the verifier from the base
         run: |
+          if [ -z "$LAW_BASE" ] || [ "$LAW_BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "LAW_BASE=$LAW_HEAD" >> "$GITHUB_ENV"
+            LAW_BASE=$LAW_HEAD
+          fi
           git worktree add --detach "$RUNNER_TEMP/base" "$LAW_BASE"
           (cd "$RUNNER_TEMP/base" && GOWORK=off go build -o "$RUNNER_TEMP/lawgate" ./cmd/lawgate)
       - name: Check code owners and audit history

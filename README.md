@@ -1,5 +1,7 @@
 # lawgate
 
+[![Law gate](https://github.com/pantacor/lawgate/actions/workflows/lawgate.yml/badge.svg)](https://github.com/pantacor/lawgate/actions/workflows/lawgate.yml) [![Website](https://github.com/pantacor/lawgate/actions/workflows/pages.yml/badge.svg)](https://pantacor.github.io/lawgate/)
+
 Lawgate runs repository rules against Go and Node modules and publishes the
 results as Markdown, HTML, and JUnit. It uses Go 1.25 and the standard library.
 
