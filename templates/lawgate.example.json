@@ -1,0 +1,27 @@
+{
+  "owner": "@your-org/law-owners",
+  "platform": "github",
+  "modules": [
+    {
+      "path": ".",
+      "language": "go",
+      "laws": "docs/LAWS.md",
+      "machines": true,
+      "machine_command": ["go", "run", "./cmd/machine"],
+      "test_command": ["go", "test", "-json", "-count=1", "./..."],
+      "required_tests": ["example.org/project/workers/TestLawsAreDocumented"]
+    },
+    {
+      "path": "chat",
+      "language": "node",
+      "laws": "chat/LAWS.md",
+      "machines": false,
+      "required_tests": ["documents the laws"]
+    }
+  ],
+  "gate_files": ["go.mod", "scripts/test-laws.sh"],
+  "rule_packages": [
+    {"path": "example.org/project/lib/statemachine", "names": ["Machine", "Law", "Edge", "CheckLaws"]},
+    {"path": "example.org/project/lib/cmdmachine", "names": ["Entry"]}
+  ]
+}

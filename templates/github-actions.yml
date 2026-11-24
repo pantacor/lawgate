@@ -1,0 +1,74 @@
+# Install in the protected repository that supplies the required workflow.
+# Require both jobs in the target repository's ruleset and require code-owner review.
+# Set the lawgate version below to the published release selected by the owner.
+name: Law gate
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+
+env:
+  LAW_GATE_VERSION: v0.1.0
+
+jobs:
+  review-rules:
+    runs-on: ubuntu-latest
+    steps:
+      # Default checkout selects the PR merge candidate (refs/pull/<n>/merge)
+      # on pull_request and the merge-queue candidate on merge_group.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Install pinned verifier
+        working-directory: ${{ runner.temp }}
+        run: GOBIN="$RUNNER_TEMP" GOWORK=off go install "github.com/pantacor/lawgate/cmd/lawgate@$LAW_GATE_VERSION"
+      - name: Check code owners and audit history
+        env:
+          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          test -n "$LAW_BASE"
+          test -n "$LAW_HEAD"
+          "$RUNNER_TEMP/lawgate" check-codeowners --base "$LAW_BASE"
+          "$RUNNER_TEMP/lawgate" rule-changes "$LAW_BASE" "$LAW_HEAD"
+
+  check-laws:
+    runs-on: ubuntu-latest
+    steps:
+      # Default checkout tests the merge candidate rather than the unmerged PR head.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install pinned verifier
+        working-directory: ${{ runner.temp }}
+        run: GOBIN="$RUNNER_TEMP" GOWORK=off go install "github.com/pantacor/lawgate/cmd/lawgate@$LAW_GATE_VERSION"
+      - name: Run law checks
+        id: laws
+        run: |
+          status=0
+          directory=$("$RUNNER_TEMP/lawgate" check --out "$RUNNER_TEMP/lawgate-reports") || status=$?
+          printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Publish summary
+        if: always() && steps.laws.outputs.directory != ''
+        env:
+          REPORT_DIRECTORY: ${{ steps.laws.outputs.directory }}
+        run: cat "$REPORT_DIRECTORY/laws-summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.laws.outputs.directory != ''
+        with:
+          name: laws-report
+          path: ${{ steps.laws.outputs.directory }}

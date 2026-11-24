@@ -1,0 +1,239 @@
+{{ define "main" }}
+{{- $v := site.Params.version -}}
+{{- $install := printf "go install %s/cmd/lawgate@%s" site.Params.module $v -}}
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">The laws-and-proofs gate from Pantacor</p>
+      <h1>Humans own the laws. The gate checks every change.</h1>
+      <p class="lede">lawgate keeps the rules of a repository in <code>LAWS.md</code>, written by people. One command, <code>lawgate check</code>, checks every law against the code and refuses a change that breaks one.</p>
+      <div class="cta-row">
+        <a class="btn" href="#quickstart">
+          <span>Get started</span>
+          <span class="btn-meta">{{ $v }}</span>
+        </a>
+        <a class="btn btn-ghost" href="{{ site.Params.repo }}">Source on GitHub</a>
+      </div>
+      <p class="fineprint">Go 1.25, standard library only · Go and Node modules · GitHub and GitLab</p>
+    </div>
+
+    {{- /* The four laws of the example module (example/LAWS.md) and what enforces each. */ -}}
+    {{- $laws := slice
+        (dict "name" "no-silent-errors" "by" "machine worker")
+        (dict "name" "validate-before-store" "by" "machine worker")
+        (dict "name" "generated-is-fresh" "by" "test TestWorkerStatesAreFresh")
+        (dict "name" "rejects-empty-payload" "by" "test TestRejectsEmptyPayload") -}}
+    <figure class="gate-card" aria-label="The laws of the example module and their verdicts">
+      <figcaption class="gate-head">
+        <span class="mono">example/LAWS.md</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="mono">lawgate check</span>
+      </figcaption>
+      <ul class="gate-laws" id="gate-laws">
+        {{- range $laws }}
+        <li>
+          <span class="gate-law">{{ .name }}</span>
+          <span class="gate-by">Enforced by: {{ .by }}</span>
+          <span class="verdict">Holds</span>
+        </li>
+        {{- end }}
+      </ul>
+      <div class="gate-status">
+        <span id="gate-phase" class="phase">Passed</span>
+        <span class="mono" id="gate-change">4 laws hold</span>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<section class="section section-alt" id="why">
+  <div class="wrap">
+    <p class="eyebrow">Why lawgate</p>
+    <h2 class="section-title">AI agents write most of the code. People still decide the rules.</h2>
+    <div class="features">
+      <article>
+        <h3>People write the laws</h3>
+        <p>A law is one sentence in <code>LAWS.md</code> that says what the code must never do. An agent can read it. Only the owner can change it.</p>
+      </article>
+      <article>
+        <h3>Every law has a source</h3>
+        <p>A law cites a file in the repository, a URL or a dated owner decision. It also names what enforces it: a machine, a test or a script.</p>
+      </article>
+      <article>
+        <h3>A law has to bite</h3>
+        <p>The gate switches the protected behaviour off and reruns the enforcer. If the test still passes, the law fails. A test that cannot fail proves nothing.</p>
+      </article>
+      <article>
+        <h3>Rule changes need the owner</h3>
+        <p>lawgate lists every file that declares or enforces a rule and checks that CODEOWNERS names the owner for each one. The platform then requires the owner's review.</p>
+      </article>
+      <article>
+        <h3>It fails closed</h3>
+        <p>A missing module, a crashed runner, an empty report or a test that did not run fails the gate. Nothing is shown green because it was skipped.</p>
+      </article>
+      <article>
+        <h3>One command</h3>
+        <p><code>lawgate check</code> runs everything listed in <code>lawgate.json</code> and writes a Markdown summary, an HTML page and JUnit files.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="layers">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2 class="section-title">Four layers, from the written law to the proof.</h2>
+    <ol class="steps">
+      <li>
+        <h3><span class="step-n">1</span>Laws</h3>
+        <p class="pkg">LAWS.md · package lawsdoc</p>
+        <p>Each law has a source, an enforcer and a status. The gate checks that the enforcer exists, names the law and ran to completion.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">2</span>Machines</h3>
+        <p class="pkg">packages machine, resolve</p>
+        <p>A worker's control flow is declared as data. Laws are checked over that graph, and every declared site is bound to the Go source, so the two cannot drift apart.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">3</span>Typed states</h3>
+        <p class="pkg">packages gen, run</p>
+        <p>Generated state types only have the declared edges, so an undeclared move does not compile. At run time the trace refuses a move the machine does not allow.</p>
+      </li>
+      <li>
+        <h3><span class="step-n">4</span>Kernels</h3>
+        <p class="pkg">package prove</p>
+        <p>A small pure function is checked on every input inside declared bounds. Within those bounds a pass is a proof, not a sample.</p>
+      </li>
+    </ol>
+    <p class="foot-note">You can adopt layer 1 alone and add the others when a module needs them. The <a href="{{ "docs/concepts/" | relURL }}">concepts guide</a> explains each term with an example.</p>
+  </div>
+</section>
+
+<section class="section section-band" id="pantacor">
+  <div class="wrap band-grid">
+    <div>
+      <p class="eyebrow">Made by Pantacor</p>
+      <h2>Extracted from the repositories it gates.</h2>
+      <p>lawgate came out of Pantacor Fleet and the Pantavisor AI stack, where it checks every change. It also checks itself: its own laws are in <code>LAWS.md</code> and its own gate runs in CI.</p>
+      <div class="cta-row">
+        <a class="btn btn-onband" href="{{ site.Params.repo }}/blob/main/LAWS.md">Read lawgate's laws</a>
+        <a class="btn btn-ghost-onband" href="{{ site.Params.repo }}/tree/main/example">See the example module</a>
+      </div>
+    </div>
+    <div class="terminal" aria-label="Command-line example">
+      <div class="terminal-bar"><i></i><i></i><i></i><span>lawgate's own gate</span></div>
+<pre><code><span class="c"># the command prints the directory of its reports</span>
+<span class="p">$</span> lawgate check --out /tmp/laws
+/tmp/laws/run-1453756126
+
+<span class="p">$</span> cat /tmp/laws/run-1453756126/laws-summary.md
+## Laws
+
+<span class="ok">✓ All checks passed. 1 machine, 2 machine laws,
+458 gate checks.</span>
+
+<span class="c"># a change that breaks a law exits 1</span>
+<span class="p">$</span> lawgate check --out /tmp/laws
+<span class="no">law checks failed; see /tmp/laws/run-2071184403</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <p class="eyebrow">Quickstart</p>
+    <h2 class="section-title">Adopt lawgate in five steps.</h2>
+
+    <div class="install">
+      <div class="install-item">
+        <h3>Install a pinned release with Go 1.25 or later</h3>
+        <div class="copy-block">
+          <pre><code id="cmd-install">{{ $install }}</code></pre>
+          <button type="button" class="copy" data-copy="cmd-install">Copy</button>
+        </div>
+      </div>
+      <div class="install-item">
+        <h3>Or run it from a checkout of lawgate</h3>
+        <div class="copy-block">
+          <pre><code id="cmd-run">go run ./cmd/lawgate check</code></pre>
+          <button type="button" class="copy" data-copy="cmd-run">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <ol class="quick">
+      <li>
+        <div class="quick-copy">
+          <h3><span class="step-n">1</span>Run <code>lawgate init</code></h3>
+          <p>It finds one module for each <code>go.mod</code> and writes <code>lawgate.json</code>, an empty readability baseline, a CODEOWNERS block and the CI file. It never overwrites an existing file.</p>
+        </div>
+        <div class="quick-code">
+          <div class="copy-block">
+            <pre><code id="cmd-init">lawgate init --platform github --owner @your-org/law-owners</code></pre>
+            <button type="button" class="copy" data-copy="cmd-init">Copy</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="quick-copy">
+          <h3><span class="step-n">2</span>Write <code>LAWS.md</code></h3>
+          <p>One section for each law: what it forbids, where it comes from, what enforces it and its status. Name the law in the test that enforces it.</p>
+        </div>
+        <div class="quick-code">
+          <div class="copy-block">
+<pre><code id="cmd-law">### rejects-empty-payload
+
+Processing a job with an empty payload fails.
+
+- Source: owner decision 2026-11-20
+- Enforced by: test `TestRejectsEmptyPayload`
+- Status: agreed 2026-11-20</code></pre>
+            <button type="button" class="copy" data-copy="cmd-law">Copy</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="quick-copy">
+          <h3><span class="step-n">3</span>Run <code>lawgate check</code></h3>
+          <p>Run it before every commit. It prints a fresh report directory under <code>laws-report</code> and exits 1 when a law is broken or a check could not run.</p>
+        </div>
+        <div class="quick-code">
+          <div class="copy-block">
+            <pre><code id="cmd-check">lawgate check</code></pre>
+            <button type="button" class="copy" data-copy="cmd-check">Copy</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="quick-copy">
+          <h3><span class="step-n">4</span>Require the CI jobs</h3>
+          <p><code>init</code> wrote <code>.github/workflows/lawgate.yml</code> (or <code>.gitlab-ci.yml</code>). Require its two jobs, <code>review-rules</code> and <code>check-laws</code>, on the protected branch. They check the merge candidate, not the branch head.</p>
+        </div>
+        <div class="quick-code">
+          <div class="copy-block">
+<pre><code id="cmd-ci">lawgate check-codeowners --base "$LAW_BASE"
+lawgate rule-changes "$LAW_BASE" "$LAW_HEAD"
+lawgate check</code></pre>
+            <button type="button" class="copy" data-copy="cmd-ci">Copy</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="quick-copy">
+          <h3><span class="step-n">5</span>Keep CODEOWNERS exact</h3>
+          <p>Require code-owner review on the protected branch. When rule files change, regenerate the entries and check that the owner covers every one.</p>
+        </div>
+        <div class="quick-code">
+          <div class="copy-block">
+<pre><code id="cmd-owners">lawgate codeowners --fallback > .github/CODEOWNERS
+lawgate check-codeowners</code></pre>
+            <button type="button" class="copy" data-copy="cmd-owners">Copy</button>
+          </div>
+        </div>
+      </li>
+    </ol>
+    <p class="foot-note">The <a href="{{ "docs/user_guide/" | relURL }}">user guide</a> covers each step in full. When the gate fails, see <a href="{{ "docs/troubleshooting/" | relURL }}">troubleshooting</a>. To work on lawgate itself, see the <a href="{{ "docs/developer_guide/" | relURL }}">developer guide</a>.</p>
+  </div>
+</section>
+{{ end }}

@@ -1,0 +1,36 @@
+# Inject these jobs from a protected project using a pipeline execution policy.
+# Require merged-results pipelines and code-owner approval on protected branches.
+# Set the lawgate version below to the published release selected by the owner.
+# Use isolated runners and grant no protected variables to candidate code.
+.lawgate:
+  # For Node modules, use an image that includes Go and Node.js.
+  image: golang:1.25
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - test "$CI_MERGE_REQUEST_REF_PATH" = "refs/merge-requests/$CI_MERGE_REQUEST_IID/merge"
+    - test -n "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"
+    - test -n "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"
+    - export LAW_GATE_BIN="$(mktemp -d)"
+    - (cd "$LAW_GATE_BIN" && GOBIN="$LAW_GATE_BIN" GOWORK=off go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0)
+
+review-rules:
+  extends: .lawgate
+  variables:
+    GIT_DEPTH: '0'
+  script:
+    # Keep the merged-results checkout for CODEOWNERS coverage while auditing
+    # the source-branch history against the target branch SHA.
+    - '"$LAW_GATE_BIN/lawgate" check-codeowners --platform gitlab --base "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"'
+    - '"$LAW_GATE_BIN/lawgate" rule-changes "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA" "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"'
+
+check-laws:
+  extends: .lawgate
+  script:
+    - '"$LAW_GATE_BIN/lawgate" check --out "lawgate-reports-$CI_JOB_ID"'
+  artifacts:
+    when: always
+    paths:
+      - lawgate-reports-$CI_JOB_ID/run-*/
+    reports:
+      junit: lawgate-reports-$CI_JOB_ID/run-*/*.xml

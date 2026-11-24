@@ -1,0 +1,65 @@
+# lawgate's own gate. Require both jobs in the branch ruleset, with
+# code-owner review. The verifier that judges a change is built from the
+# base commit, so a change cannot weaken the checks that review it; a change
+# to lawgate.json that the base verifier cannot read lands in two steps.
+name: Law gate
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # The default ref is the merge candidate: the PR merge commit, or the
+      # merge-queue commit.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Format, vet and test
+        run: |
+          unformatted=$(gofmt -l .)
+          test -z "$unformatted" || { printf '%s\n' "$unformatted"; exit 1; }
+          go vet ./...
+          go test -race -count=1 ./...
+
+  review-rules:
+    runs-on: ubuntu-latest
+    env:
+      LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Build the verifier from the base
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/base" "$LAW_BASE"
+          (cd "$RUNNER_TEMP/base" && GOWORK=off go build -o "$RUNNER_TEMP/lawgate" ./cmd/lawgate)
+      - name: Check code owners and audit history
+        run: |
+          "$RUNNER_TEMP/lawgate" check-codeowners --base "$LAW_BASE"
+          "$RUNNER_TEMP/lawgate" rule-changes "$LAW_BASE" "$LAW_HEAD"
+      - name: Run the laws
+        id: laws
+        run: |
+          status=0
+          directory=$("$RUNNER_TEMP/lawgate" check --out "$RUNNER_TEMP/lawgate-reports") || status=$?
+          printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Publish summary
+        if: always() && steps.laws.outputs.directory != ''
+        env:
+          REPORT_DIRECTORY: ${{ steps.laws.outputs.directory }}
+        run: cat "$REPORT_DIRECTORY/laws-summary.md" >> "$GITHUB_STEP_SUMMARY"

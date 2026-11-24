@@ -1,0 +1,28 @@
+{
+  "product": "lawgate",
+  "modules": [
+    {
+      "path": ".",
+      "language": "go",
+      "laws": "LAWS.md",
+      "machines": false
+    },
+    {
+      "path": "example",
+      "language": "go",
+      "laws": "example/LAWS.md",
+      "machines": true,
+      "generate_check": [
+        "go",
+        "run",
+        "./cmd/genstates",
+        "-check"
+      ]
+    }
+  ],
+  "readability": {
+    "baseline": ".lawgate-readability"
+  },
+  "owner": "@highercomve",
+  "platform": "github"
+}

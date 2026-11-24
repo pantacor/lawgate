@@ -1,0 +1,12 @@
+{{ define "main" }}
+<div class="wrap doc-index">
+  <p class="eyebrow">Documentation</p>
+  <h1>Guides</h1>
+  <ul class="guide-list">
+    {{- /* The summary starts with the page heading, which the link already shows. */ -}}
+    {{- range .RegularPages.ByTitle }}
+    <li><a href="{{ .RelPermalink }}"><strong>{{ partial "title.html" . }}</strong><span>{{ .Summary | plainify | htmlUnescape | strings.TrimPrefix (partial "title.html" .) | truncate 140 }}</span></a></li>
+    {{- end }}
+  </ul>
+</div>
+{{ end }}
