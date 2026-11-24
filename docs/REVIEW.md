@@ -43,8 +43,9 @@ yet. It lists:
 - **Rule changes**: the commits that touch a rule file, as `rulechanges`
   classifies them (the same list `lawgate rule-files` prints), and whether
   each carries a `Rule-change-approved-by:` trailer or a later commit's
-  `Rule-change-approves:`. The trailer is an audit note: the owner's review
-  on the platform (CODEOWNERS) is the approval.
+  `Rule-change-approves:`. The trailer is an audit note: the approval is
+  the owner's approval on the pull request or merge request, which
+  `lawgate rule-changes` checks in CI when `require_approval` is on.
 - **Proof lock**: when the branch changes `LAWS.lock`, which laws' proofs or
   subjects changed. Each needs the owner's review.
 - **Declaration problems**: drift between a machine and its source (a tag no

@@ -7,6 +7,30 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+## [0.1.1] - unreleased
+
+The adopters are private repositories on the free plans of GitHub and
+GitLab, where required code-owner review, branch protection, rulesets and
+required checks are paid features. CI can now check the owner's approval
+through the platform's API (owner decisions 2026-11-24).
+
+### Added
+
+- `lawgate.json` `require_approval` (default `false`; needs `owner` and `platform`): when true in `lawgate.json` at BASE, `lawgate rule-changes BASE HEAD` checks, in CI, that the owner approved the pull request or merge request behind every rule-file change. Read at BASE, so a change cannot switch it off for itself; the change that switches it on takes effect from the next change. Off, `rule-changes` prints only the audit and needs no token. `--require-approval` turns the check on for one run.
+- The approval check: the owner is `lawgate.json`'s owner at BASE (a user, never a team or group). A pull request or merge request the owner authored counts as approved, and the verdict says so ("authored by @owner: counts as approved"). GitHub pull requests: the owner's latest deciding review is `APPROVED` on the head commit; a later request for changes or dismissal wins. GitLab merge requests: the owner is in the approvals and the owner's latest "approved this merge request" note is newer than the latest diff version and not followed by "unapproved". Pushes to the default branch: every rule-file commit comes from a merged pull request or merge request the owner approved or authored; a commit pushed without one is named. A merge queue run reads no approval. Outside CI or without `GITHUB_TOKEN` / `LAWGATE_API_TOKEN` it fails and names the missing variable.
+- `approval`: the package behind the check (stdlib `net/http`, 30-second timeouts, `Link` and `X-Next-Page` pagination on the API host only, no token in errors).
+- `rulechanges.AuditRange` returns HEAD's commit ID and the commits of the audited range that changed rule files, with their files.
+
+### Changed
+
+- `rule-changes-are-reviewed` (owner decision 2026-11-24): every rule file is listed for the owner in CODEOWNERS, and when `require_approval` is on CI's `rule-changes` checks the owner's approval on the pull request or merge request (one the owner authored counts as approved). Enforced also by the `approval` tests; subjects `approval.judgeReviews`, `approval.gitlabEvidence.verdict` and `approval.githubAPI.judgeCommit`.
+- Approval is the owner's approval on the pull request or merge request, not the platform's code-owner review. CODEOWNERS stays the list of rule files (`codeowners` and `check-codeowners` are unchanged). README, the user guide, concepts, troubleshooting, the review guide and the website say so, and name the limit: while agents push and open pull or merge requests with the owner's credentials, their changes look authored by the owner and pass; a separate account for agents closes that. On GitLab Free "Pipelines must succeed" blocks a merge without the approval; on GitHub Free private repositories a missing approval is detected (red pull request check and the push check on the default branch), not prevented.
+- `templates/github-actions.yml`: runs on `pull_request_review` (submitted, dismissed) and on pushes to the default branch, with `permissions: pull-requests: read`; `review-rules` passes `GITHUB_TOKEN` to `rule-changes`, which decides from `require_approval`; a review does not rerun `check-laws`. Pins lawgate v0.1.1.
+- `templates/gitlab-ci.yml`: uses only GitLab Free. Merge request pipelines (no merged-results pipelines or pipeline execution policy) and push pipelines of the default branch, BASE from `CI_MERGE_REQUEST_DIFF_BASE_SHA` or `CI_COMMIT_BEFORE_SHA`; documents that `LAWGATE_API_TOKEN` and "Pipelines must succeed" are needed only with `require_approval` on, and the pipeline rerun after an approval. Pins lawgate v0.1.1.
+- The CODEOWNERS fallback templates describe CODEOWNERS as the list of rule files the owner approves.
+- lawgate's own `lawgate.json` sets `require_approval`, and its workflow runs on `pull_request_review`.
+- The install lines (README, user guide, website, VS Code extension README) name v0.1.1.
+
 ## [0.1.0] - unreleased
 
 The first release: the laws-and-proofs gate extracted from Pantacor Fleet

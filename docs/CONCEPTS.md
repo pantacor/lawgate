@@ -297,10 +297,23 @@ closure. `lawgate check-codeowners` fails when the owner does not cover one.
 
 ## Owner
 
-The owner is the person or team that approves rule changes. It is set in
-`lawgate.json`, for example `"owner": "@your-org/law-owners"`. Approval is the
-platform's code-owner review, required by branch protection. In CI the owner
-is read from the base branch, so a change cannot name its own reviewer.
+The owner is the person who approves rule changes. It is set in
+`lawgate.json`, for example `"owner": "@name"`. Approval is the owner's
+approval on the pull request or merge request. With `"require_approval":
+true` in `lawgate.json`, `lawgate rule-changes` checks it in CI through the
+platform's API, so it needs a user: a team cannot approve. A pull request
+or merge request the owner authored counts as approved. While agents push
+and open them with the owner's credentials, their changes look authored by
+the owner and pass; running agents under their own account closes that.
+The check is off by default, and it is read from the base branch, so a
+change cannot switch it off for itself. lawgate does not rely on code-owner
+review or branch protection, which are paid features on the free plans of
+GitHub and GitLab. On GitLab Free, "Pipelines must succeed" blocks a merge
+the owner has not approved. On GitHub Free private repositories nothing can
+block it: the pull request check goes red and the check on the push to the
+default branch names the commit, so a missing approval is detected, not
+prevented. In CI the owner is read from the base branch, so a change cannot
+name its own approver.
 
 ## Fail closed
 

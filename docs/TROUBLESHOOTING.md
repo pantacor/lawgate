@@ -299,7 +299,77 @@ Add `"platform": "github"` or `"platform": "gitlab"`.
 
 A commit has a `Rule-change-approves:` trailer without a
 `Rule-change-approved-by:` trailer. Add the second one. Both are audit notes.
-The approval itself is the platform review.
+The approval itself is the owner's approval on the pull request or merge
+request, which `rule-changes` checks when `require_approval` is on.
+
+## The owner's approval
+
+### `rule files changed (...): approval by @owner on <commit> is missing (...)`
+
+A commit in the range changes rule files, and the owner has not approved
+the pull request or merge request at its head. The reason in brackets says
+what the platform answered:
+
+- `@owner has not approved ...`: the owner approves it.
+- `@owner approved <commit>, an older commit` (GitHub) or
+  `@owner approved before the latest push` (GitLab): commits were pushed
+  after the approval. The owner approves again.
+- `@owner requested changes`, `@owner's review was dismissed` or
+  `@owner revoked the approval`: the latest decision wins. The owner
+  approves again.
+
+On GitHub the approval runs the check again. On GitLab it does not: rerun
+the `review-rules` job, or run a new pipeline for the merge request.
+
+A pull request or merge request the owner authored passes without a
+review (`authored by @owner: counts as approved`). While agents push and
+open them with the owner's credentials, their changes pass the same way:
+run agents under their own account to close that.
+
+### `lawgate.json: require_approval requires an owner and a platform`
+
+Set `owner` (a user, such as `@name`) and `platform` next to
+`require_approval`, or remove `require_approval`.
+
+### `... commit <commit> reached the default branch without a pull request`
+
+On a push to the default branch, a rule-file commit has no merged pull
+request or merge request. It was pushed directly, perhaps by the owner. The
+approval is what the check reads, so every rule-file change goes through a
+pull request or merge request. Revert the commit and open one.
+
+### `... it is merged already: revert it, or land it again ...`
+
+The pull request or merge request that merged the commit had no valid
+approval. Revert the commit, or open a new pull request or merge request
+the owner approves.
+
+### `owner @org/team is a team or group: only a user can approve a rule change here`
+
+A team or a GitLab group cannot approve a pull request or merge request.
+Set `owner` in `lawgate.json` to the user who approves rule changes.
+
+### `cannot check the owner's approval: ...` / `<VARIABLE> is not set`
+
+With `require_approval` on at BASE (or `--require-approval`),
+`rule-changes` reads the approval from the CI platform, and fails when it
+cannot. With it off, `rule-changes` needs no token. Run it in the CI job. On GitHub, pass
+`GITHUB_TOKEN: ${{ github.token }}` to the step and grant
+`permissions: pull-requests: read`. On GitLab, add the masked CI/CD
+variable `LAWGATE_API_TOKEN` with a `read_api` token; `CI_JOB_TOKEN` cannot
+read approvals.
+
+### `GET /...: 401 Unauthorized` or `403 Forbidden` or `404 Not Found`
+
+The token cannot read the project's pull requests or merge requests. Check
+the workflow's `permissions` on GitHub, or the scope (`read_api`) and the
+project membership of `LAWGATE_API_TOKEN` on GitLab.
+
+### `HEAD <commit> is not the head <commit> of pull request #N` / `... is not the latest version ...`
+
+The range the job passes does not end at the pull request's head or the
+merge request's latest push. Pass the head as HEAD. On GitLab, rerun the
+pipeline of the latest push.
 
 ## Configuration and commands
 

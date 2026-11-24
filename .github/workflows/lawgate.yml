@@ -1,19 +1,28 @@
-# lawgate's own gate. Require the test and review-rules jobs in the branch ruleset, with
-# code-owner review. The verifier that judges a change is built from the
-# base commit, so a change cannot weaken the checks that review it; a change
-# to lawgate.json that the base verifier cannot read lands in two steps.
+# lawgate's own gate. lawgate.json sets require_approval, so a change to a
+# rule file needs the owner's approval on the pull request (or the owner as
+# its author), which `lawgate rule-changes` reads from the GitHub API; the
+# run on a push to main names any rule-file commit that landed without it. The verifier that judges a change is built from
+# the base commit, so a change cannot weaken the checks that review it; a
+# change to lawgate.json that the base verifier cannot read lands in two
+# steps.
 name: Law gate
 on:
   pull_request:
+  # An approval or a dismissal runs the approval check again.
+  pull_request_review:
+    types: [submitted, dismissed]
   merge_group:
   # Every change that reaches main is checked again there.
   push:
     branches: [main]
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   test:
+    # A review changes no code: the tests are not run again for it.
+    if: github.event_name != 'pull_request_review'
     runs-on: ubuntu-latest
     steps:
       # The default ref is the merge candidate: the PR merge commit, or the
@@ -62,12 +71,17 @@ jobs:
           fi
           git worktree add --detach "$RUNNER_TEMP/base" "$LAW_BASE"
           (cd "$RUNNER_TEMP/base" && GOWORK=off go build -o "$RUNNER_TEMP/lawgate" ./cmd/lawgate)
-      - name: Check code owners and audit history
+      - name: Check code owners, audit history and the owner's approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           "$RUNNER_TEMP/lawgate" check-codeowners --base "$LAW_BASE"
+          # require_approval in the base's lawgate.json decides whether the
+          # owner's approval is checked.
           "$RUNNER_TEMP/lawgate" rule-changes "$LAW_BASE" "$LAW_HEAD"
       - name: Run the laws
         id: laws
+        if: github.event_name != 'pull_request_review'
         run: |
           status=0
           # The base decides: a verifier built before proof replay existed
@@ -87,6 +101,7 @@ jobs:
 
   # The VS Code extension in editors/vscode (npm and Node come with the runner).
   vscode:
+    if: github.event_name != 'pull_request_review'
     runs-on: ubuntu-latest
     defaults:
       run:

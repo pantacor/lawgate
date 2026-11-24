@@ -1,5 +1,6 @@
-# Require code-owner approval on the protected branch. Keep the Law gate
-# section mandatory. The fallback covers new rule files until the generated
+# The rule files the owner approves. With require_approval on, CI checks
+# the approval on the merge request (lawgate rule-changes). Keep the Law
+# gate section. The fallback covers new rule files until the generated
 # block lists them.
 [Law gate]
 * @your-org/law-owners

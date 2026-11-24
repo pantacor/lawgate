@@ -48,6 +48,10 @@ type Config struct {
 	// CODEOWNERS entry can cover them, so lawgate notes them instead of
 	// failing.
 	OutsideIncludes []string `json:"outside_includes,omitempty"`
+	// RequireApproval makes rule-changes check the owner's approval of the
+	// pull or merge request behind every rule-file change. rule-changes
+	// reads it at BASE, so a change cannot switch it off for itself.
+	RequireApproval bool `json:"require_approval,omitempty"`
 }
 
 // Command overrides are argv arrays. Machine commands receive -laws -junit FILE.
@@ -216,6 +220,9 @@ func (config Config) validatePlatform() error {
 	}
 	if config.Owner != "" && config.Platform == "" {
 		return fmt.Errorf("%s: owner requires a platform", Filename)
+	}
+	if config.RequireApproval && config.Owner == "" {
+		return fmt.Errorf("%s: require_approval requires an owner and a platform", Filename)
 	}
 	return nil
 }

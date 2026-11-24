@@ -85,7 +85,7 @@ type RuleChange struct {
 	ApprovedBy []string `json:"approved_by,omitempty"`
 	// Approved is set when the commit, or a later one that approves it,
 	// carries the audit trailer. The approval that counts is the owner's
-	// review on the platform.
+	// approval on the pull or merge request (rule-changes --require-approval).
 	Approved bool `json:"approved"`
 }
 

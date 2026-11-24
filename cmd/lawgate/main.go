@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/pantacor/lawgate/approval"
 	"github.com/pantacor/lawgate/bite"
 	"github.com/pantacor/lawgate/inventory"
 	"github.com/pantacor/lawgate/rulechanges"
@@ -207,16 +208,102 @@ func loadOwnerConfig(options ownerOptions) (inventory.Config, error) {
 	return inventory.Load(options.root)
 }
 
-func changesCommand(arguments []string, output io.Writer) error {
+// changesOptions are the flags and arguments of rule-changes.
+type changesOptions struct {
+	root            string
+	base            string
+	head            string
+	requireApproval bool
+}
+
+func parseChangesOptions(arguments []string) (changesOptions, error) {
+	var options changesOptions
 	flags := flag.NewFlagSet("rule-changes", flag.ContinueOnError)
-	root := flags.String("root", ".", "repository root")
+	flags.StringVar(&options.root, "root", ".", "repository root")
+	flags.BoolVar(&options.requireApproval, "require-approval", false,
+		"in CI, fail unless lawgate.json's owner approved the pull request or merge request behind every rule-file change (default: require_approval in lawgate.json at BASE)")
 	if err := flags.Parse(arguments); err != nil {
-		return err
+		return options, err
 	}
 	if flags.NArg() != 2 {
-		return errors.New("usage: lawgate rule-changes [--root DIR] BASE HEAD")
+		return options, errors.New("usage: lawgate rule-changes [--root DIR] [--require-approval] BASE HEAD")
 	}
-	return rulechanges.Audit(*root, flags.Arg(0), flags.Arg(1), output)
+	options.base, options.head = flags.Arg(0), flags.Arg(1)
+	return options, nil
+}
+
+func changesCommand(arguments []string, output io.Writer) error {
+	options, err := parseChangesOptions(arguments)
+	if err != nil {
+		return err
+	}
+	audited, auditErr := rulechanges.AuditRange(options.root, options.base, options.head, output)
+	required, err := approvalRequired(options)
+	if err != nil {
+		return errors.Join(auditErr, err)
+	}
+	if !required {
+		return auditErr
+	}
+	if auditErr != nil {
+		return fmt.Errorf("%w\nthe owner's approval was not checked: fix the audit first", auditErr)
+	}
+	return requireApproval(options, audited, output, approval.OS())
+}
+
+// approvalRequired is --require-approval, else require_approval in
+// lawgate.json at BASE: a change cannot switch the check off for itself,
+// and a change that switches it on takes effect from the next change.
+func approvalRequired(options changesOptions) (bool, error) {
+	if options.requireApproval {
+		return true, nil
+	}
+	config, err := rulechanges.ConfigAt(options.root, options.base)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("require_approval from %s at %s: %w", inventory.Filename, options.base, err)
+	}
+	return config.RequireApproval, nil
+}
+
+// requireApproval asks the platform whether the owner approved the rule
+// changes. Owner and platform come from lawgate.json at BASE, so a change
+// cannot name its own approver.
+func requireApproval(options changesOptions, audited rulechanges.AuditResult, output io.Writer, env approval.Environment) error {
+	request, err := approvalRequest(options, audited)
+	if err != nil {
+		return err
+	}
+	line, err := approval.Check(request, env)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(output, line)
+	return err
+}
+
+func approvalRequest(options changesOptions, audited rulechanges.AuditResult) (approval.Request, error) {
+	request := approval.Request{Head: audited.Head}
+	for _, change := range audited.Changes {
+		request.Changes = append(request.Changes, approval.Change{Commit: change.ID, Files: change.Files})
+	}
+	if len(request.Changes) == 0 {
+		return request, nil
+	}
+	config, err := rulechanges.ConfigAt(options.root, options.base)
+	if err != nil {
+		return request, fmt.Errorf("owner from %s at %s: %w", inventory.Filename, options.base, err)
+	}
+	if err := rulechanges.ValidOwner(config.Owner); err != nil {
+		return request, fmt.Errorf("%s at %s: %w", inventory.Filename, options.base, err)
+	}
+	if config.Platform == "" {
+		return request, fmt.Errorf("%s at %s has no platform: set github or gitlab", inventory.Filename, options.base)
+	}
+	request.Owner, request.Platform = config.Owner, config.Platform
+	return request, nil
 }
 
 // printNotes shows ownership notes (approved outside include directories,

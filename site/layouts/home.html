@@ -192,7 +192,7 @@
       </li>
       <li>
         <h3><span class="step-n">4</span>The owner guards the law</h3>
-        <p>The law, its test and the code it protects are pinned in <code>LAWS.lock</code> and cannot change without the owner's review. CI also reruns the approved test against every change. An AI cannot quietly rewrite them.</p>
+        <p>The law, its test and the code it protects are pinned in <code>LAWS.lock</code>, and a change to them needs the owner's approval on the pull request or merge request, which CI can check. CI also reruns the approved test against every change. An AI cannot quietly rewrite them.</p>
       </li>
     </ol>
 
@@ -673,8 +673,8 @@ No payment is accepted when it is larger than the balance.
       </li>
       <li>
         <div class="quick-copy">
-          <h3><span class="step-n">4</span>Require the CI jobs</h3>
-          <p><code>init</code> wrote <code>.github/workflows/lawgate.yml</code> (or <code>.gitlab-ci.yml</code>). Require its two jobs, <code>review-rules</code> and <code>check-laws</code>, on the protected branch. They check the merge candidate, not the branch head.</p>
+          <h3><span class="step-n">4</span>Commit the CI jobs</h3>
+          <p><code>init</code> wrote <code>.github/workflows/lawgate.yml</code> (or <code>.gitlab-ci.yml</code>) with two jobs, <code>review-rules</code> and <code>check-laws</code>. With <code>"require_approval": true</code> in <code>lawgate.json</code>, when a change touches a rule file, <code>review-rules</code> reads the owner's approval of the pull request or merge request from the platform's API; one the owner authored counts as approved. On GitLab Free, "Pipelines must succeed" blocks the merge until the owner approves; on GitHub Free private repositories a missing approval turns the check red and is named again on the push to the default branch: detected, not prevented.</p>
         </div>
         <div class="quick-code">
           <div class="copy-block">
@@ -688,7 +688,7 @@ lawgate check</code></pre>
       <li>
         <div class="quick-copy">
           <h3><span class="step-n">5</span>Keep CODEOWNERS exact</h3>
-          <p>Require code-owner review on the protected branch. When rule files change, regenerate the entries and check that the owner covers every one.</p>
+          <p>CODEOWNERS is the list of rule files the owner approves. When rule files change, regenerate the entries and check that the owner covers every one.</p>
         </div>
         <div class="quick-code">
           <div class="copy-block">

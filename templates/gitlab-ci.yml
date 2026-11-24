@@ -1,35 +1,58 @@
-# Inject these jobs from a protected project using a pipeline execution policy.
-# Require merged-results pipelines and code-owner approval on protected branches.
+# Add these jobs to the project's .gitlab-ci.yml.
+# With "require_approval": true in lawgate.json, `lawgate rule-changes`
+# reads the owner's approval of the merge request from the GitLab API
+# whenever a change touches a rule file; a merge request the owner opened
+# counts as approved. While agents push and open merge requests with the
+# owner's credentials, their changes look authored by the owner and pass:
+# give agents their own account to close that. Off, it only prints the
+# audit and needs no token. Code-owner approval, merged-results pipelines
+# and pipeline execution policies are paid features; this file uses only
+# GitLab Free. When require_approval is on:
+# - Turn on "Pipelines must succeed" (Settings > Merge requests): a missing
+#   approval fails review-rules and blocks the merge.
+# - Approving does not start a pipeline: after the owner approves, rerun the
+#   review-rules job (or run a new pipeline for the merge request).
+# - Add a masked CI/CD variable LAWGATE_API_TOKEN (not protected: merge
+#   request pipelines run on unprotected branches) holding a token with the
+#   read_api scope that can read this project: a project access token with
+#   the Reporter role where your plan offers them, else the personal access
+#   token of a dedicated user who is a Reporter of this project only.
+#   CI_JOB_TOKEN cannot read a merge request's approvals, notes or versions.
+#   Candidate code runs in these jobs and can read the variable: keep the
+#   token read-only and scoped to this project, and grant no other secrets.
+# Merge request pipelines test the source branch head, not the merged result.
+# For Node modules, use a job image that includes Go and Node.js.
 # Set the lawgate version below to the published release selected by the owner.
-# Use isolated runners and grant no protected variables to candidate code.
 .lawgate:
-  # For Node modules, use an image that includes Go and Node.js.
   image: golang:1.25
+  variables:
+    GIT_DEPTH: '0'
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Every change that reaches the default branch is judged again there.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   before_script:
-    - test "$CI_MERGE_REQUEST_REF_PATH" = "refs/merge-requests/$CI_MERGE_REQUEST_IID/merge"
-    - test -n "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"
-    - test -n "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"
+    # BASE is where the merge request's diff starts, or the commit before
+    # the push; a new branch has none, so there is no history to judge.
+    - if [ "$CI_PIPELINE_SOURCE" = merge_request_event ]; then test -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; fi
+    - LAW_BASE="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
+    - if [ -z "$LAW_BASE" ] || [ "$LAW_BASE" = "0000000000000000000000000000000000000000" ]; then LAW_BASE="$CI_COMMIT_SHA"; fi
+    - export LAW_BASE
     - export LAW_GATE_BIN="$(mktemp -d)"
-    - (cd "$LAW_GATE_BIN" && GOBIN="$LAW_GATE_BIN" GOWORK=off go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0)
+    - (cd "$LAW_GATE_BIN" && GOBIN="$LAW_GATE_BIN" GOWORK=off go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.1)
 
 review-rules:
   extends: .lawgate
-  variables:
-    GIT_DEPTH: '0'
   script:
-    # Keep the merged-results checkout for CODEOWNERS coverage while auditing
-    # the source-branch history against the target branch SHA.
-    - '"$LAW_GATE_BIN/lawgate" check-codeowners --platform gitlab --base "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"'
-    - '"$LAW_GATE_BIN/lawgate" rule-changes "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA" "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"'
+    - '"$LAW_GATE_BIN/lawgate" check-codeowners --platform gitlab --base "$LAW_BASE"'
+    # lawgate.json's require_approval at the base decides whether the
+    # owner's approval is checked.
+    - '"$LAW_GATE_BIN/lawgate" rule-changes "$LAW_BASE" "$CI_COMMIT_SHA"'
 
 check-laws:
   extends: .lawgate
-  variables:
-    GIT_DEPTH: '0'
   script:
-    - '"$LAW_GATE_BIN/lawgate" check --base "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA" --out "lawgate-reports-$CI_JOB_ID"'
+    - '"$LAW_GATE_BIN/lawgate" check --base "$LAW_BASE" --out "lawgate-reports-$CI_JOB_ID"'
   artifacts:
     when: always
     paths:

@@ -28,6 +28,7 @@ func TestDecodeValidation(t *testing.T) {
 		editConfig(`"modules"`, `"gate_files":["."],"modules"`):                                                               "invalid gate file",
 		editConfig(`"modules"`, `"platform":"other","modules"`):                                                               "unsupported platform",
 		editConfig(`"modules"`, `"owner":"@owner","modules"`):                                                                 "owner requires a platform",
+		editConfig(`"modules"`, `"require_approval":true,"modules"`):                                                          "require_approval requires an owner",
 		editConfig(`"modules"`, `"readability":{"baseline":"."},"modules"`):                                                   "invalid readability baseline",
 		editConfig(`"modules"`, `"readability":{"baseline":"rules.txt","exclude":["["]},"modules"`):                           "invalid readability glob",
 	}

@@ -34,6 +34,7 @@
         }
       ],
       "test_files": [
+        "cmd/lawgate/approval_test.go",
         "cmd/lawgate/bite_mutation_test.go",
         "cmd/lawgate/bite_regressions_test.go",
         "cmd/lawgate/bite_reruns_test.go",
@@ -99,6 +100,7 @@
         }
       ],
       "test_files": [
+        "cmd/lawgate/approval_test.go",
         "cmd/lawgate/bite_mutation_test.go",
         "cmd/lawgate/bite_regressions_test.go",
         "cmd/lawgate/bite_reruns_test.go",
@@ -210,8 +212,20 @@
       "module": ".",
       "document": "LAWS.md",
       "law": "rule-changes-are-reviewed",
-      "proof": "e926d4913544b6bbd942b5b5f60a46606f84f8858826015677dcbd9cbdd6e24a",
+      "proof": "633c03452494337dd618f9c632625a28575e927304e83b2c826cd6f0594b9c63",
       "subjects": [
+        {
+          "reference": "github.com/pantacor/lawgate/approval.githubAPI.judgeCommit",
+          "fingerprint": "dfbf4bafe7fa9bda7bb0130a1362f1358189253173c0dde978add3e9a4396816"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/approval.gitlabEvidence.verdict",
+          "fingerprint": "52522ba9e978181ebfbdf4f445f3d19a2d0de44c81fa5b7d662efe07d9f460db"
+        },
+        {
+          "reference": "github.com/pantacor/lawgate/approval.judgeReviews",
+          "fingerprint": "82c4df6cceb0b9b3a9d331c1b1a8ad81745e325203166ae8b469791324dd4814"
+        },
         {
           "reference": "github.com/pantacor/lawgate/rulechanges.checkCoverage",
           "fingerprint": "73e66bb8fd50e884cb59cf0f9052b67630f1417f12294f1993b7822f873c600f"
@@ -222,6 +236,101 @@
         }
       ],
       "tests": [
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPassesAPullRequestTheOwnerAuthored",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPassesTheOwnersApprovalOfTheHead",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPullRequestByAnotherAuthorNeedsTheApproval",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushNamesACommitWithoutPullRequest",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushNamesAnUnapprovedPullRequest",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushPassesACommitFromAPullRequestTheOwnerAuthored",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushPassesACommitFromAnApprovedPullRequest",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushReportsAFailedPullRequestLookup",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubPushReportsAFailedReviewLookup",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubRefusesADismissedApproval",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubRefusesAnApprovalOfAnOlderCommit",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitHubRefusesChangesRequestedAfterApproval",
+          "file": "approval/github_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabIgnoresAnotherUsersApprovalAndPlainComments",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabMergeRequestByAnotherAuthorNeedsTheApproval",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabPassesAMergeRequestTheOwnerAuthored",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabPassesAnApprovalAfterTheLatestPush",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabRefusesAnApprovalOfAnOlderVersion",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabRefusesUnapprovedAfterApproved",
+          "file": "approval/gitlab_test.go"
+        },
+        {
+          "package": "github.com/pantacor/lawgate/approval",
+          "name": "TestGitLabTrustsTheLatestNoteOverTheApprovalList",
+          "file": "approval/gitlab_test.go"
+        },
         {
           "package": "github.com/pantacor/lawgate/cmd/lawgate",
           "name": "TestCheckFailsUncoveredRuleFile",
@@ -234,6 +343,11 @@
         }
       ],
       "test_files": [
+        "approval/approval_test.go",
+        "approval/fake_test.go",
+        "approval/github_test.go",
+        "approval/gitlab_test.go",
+        "cmd/lawgate/approval_test.go",
         "cmd/lawgate/bite_mutation_test.go",
         "cmd/lawgate/bite_regressions_test.go",
         "cmd/lawgate/bite_reruns_test.go",
@@ -250,6 +364,7 @@
         "cmd/lawgate/owners_test.go",
         "cmd/lawgate/phases_test.go",
         "cmd/lawgate/vendor_owners_test.go",
+        "rulechanges/audit_range_test.go",
         "rulechanges/closure_test.go",
         "rulechanges/codeowners_test.go",
         "rulechanges/commands_test.go",

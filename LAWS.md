@@ -23,16 +23,21 @@ problem.
 ### rule-changes-are-reviewed
 
 No law, guard, kernel bound, proof property or gate file changes without the
-owner's review: every rule file is covered by the required owner in
-CODEOWNERS, which the platform enforces; a commit trailer is only an audit
-note.
+owner's approval: every rule file is listed for the owner in CODEOWNERS,
+and when `require_approval` is on (in `lawgate.json` at the base, or
+`--require-approval`) CI's `rule-changes` checks the owner's approval on
+the pull request or merge request (a pull or merge request the owner
+authored counts as approved); a commit trailer is only an audit note.
 
 - Source: Owner decision 2026-11-19 (the proof-gated development plan); owner decision 2026-11-20:
-  approval is platform review (CODEOWNERS naming the owner, enforced by
-  branch protection), not a typed trailer.
-- Enforced by: test `TestCheckFailsUncoveredRuleFile`, test `TestAuditRejectsRetroactiveNoteWithoutItsOwnApprovalTrailer`
-- Subject: github.com/pantacor/lawgate/rulechanges.checkCoverage, github.com/pantacor/lawgate/rulechanges.history.auditCommit
-- Status: agreed 2026-11-20
+  approval is not a typed trailer; owner decision 2026-11-24: required
+  code-owner review and branch protection are paid features on the free
+  plans of GitHub and GitLab, so CI checks the owner's approval through the
+  platform API when `require_approval` is on, and a pull or merge request
+  the owner authored counts as approved.
+- Enforced by: test `TestCheckFailsUncoveredRuleFile`, test `TestAuditRejectsRetroactiveNoteWithoutItsOwnApprovalTrailer`, test `TestGitHubPassesTheOwnersApprovalOfTheHead`, test `TestGitHubRefusesAnApprovalOfAnOlderCommit`, test `TestGitHubRefusesChangesRequestedAfterApproval`, test `TestGitHubRefusesADismissedApproval`, test `TestGitHubPassesAPullRequestTheOwnerAuthored`, test `TestGitHubPullRequestByAnotherAuthorNeedsTheApproval`, test `TestGitHubPushPassesACommitFromAnApprovedPullRequest`, test `TestGitHubPushNamesACommitWithoutPullRequest`, test `TestGitHubPushNamesAnUnapprovedPullRequest`, test `TestGitHubPushPassesACommitFromAPullRequestTheOwnerAuthored`, test `TestGitHubPushReportsAFailedPullRequestLookup`, test `TestGitHubPushReportsAFailedReviewLookup`, test `TestGitLabPassesAnApprovalAfterTheLatestPush`, test `TestGitLabRefusesAnApprovalOfAnOlderVersion`, test `TestGitLabRefusesUnapprovedAfterApproved`, test `TestGitLabTrustsTheLatestNoteOverTheApprovalList`, test `TestGitLabIgnoresAnotherUsersApprovalAndPlainComments`, test `TestGitLabPassesAMergeRequestTheOwnerAuthored`, test `TestGitLabMergeRequestByAnotherAuthorNeedsTheApproval`
+- Subject: github.com/pantacor/lawgate/rulechanges.checkCoverage, github.com/pantacor/lawgate/rulechanges.history.auditCommit, github.com/pantacor/lawgate/approval.judgeReviews, github.com/pantacor/lawgate/approval.gitlabEvidence.verdict, github.com/pantacor/lawgate/approval.githubAPI.judgeCommit
+- Status: agreed 2026-11-24
 
 ### laws-bite
 

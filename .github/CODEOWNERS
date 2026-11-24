@@ -1,5 +1,6 @@
-# Require code-owner review on the target branch. The fallback covers new
-# rule files until the generated block lists them.
+# The rule files the owner approves. With require_approval on, CI checks
+# the approval on the pull request (lawgate rule-changes). The fallback
+# covers new rule files until the generated block lists them.
 * @highercomve
 
 # lawgate rule files
@@ -9,9 +10,19 @@
 /.lawgate-readability @highercomve
 /LAWS.lock @highercomve
 /LAWS.md @highercomve
+/approval/approval.go @highercomve
+/approval/approval_test.go @highercomve
+/approval/client.go @highercomve
+/approval/fake_test.go @highercomve
+/approval/github.go @highercomve
+/approval/github_test.go @highercomve
+/approval/gitlab.go @highercomve
+/approval/gitlab_test.go @highercomve
+/approval/messages.go @highercomve
 /bite/bite.go @highercomve
 /bite/doc.go @highercomve
 /bite/switch_test.go @highercomve
+/cmd/lawgate/approval_test.go @highercomve
 /cmd/lawgate/bite_go.go @highercomve
 /cmd/lawgate/bite_mutation_test.go @highercomve
 /cmd/lawgate/bite_regressions_test.go @highercomve
@@ -201,6 +212,7 @@
 /review/report_rules.go @highercomve
 /review/report_test.go @highercomve
 /review/types.go @highercomve
+/rulechanges/audit_range_test.go @highercomve
 /rulechanges/closure_test.go @highercomve
 /rulechanges/codeowners.go @highercomve
 /rulechanges/codeowners_test.go @highercomve

@@ -14,7 +14,7 @@ reference.
 ## Adopt lawgate in a repo in 5 steps
 
 1. Install a pinned release with
-   `go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0`. Use the same
+   `go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.1`. Use the same
    pinned release in CI. From a local checkout, run `go run ./cmd/lawgate`.
 2. Run `lawgate init --platform github --owner @name` (or use `gitlab`).
    Review the discovered Go modules, correct their law document paths, and
@@ -29,14 +29,18 @@ reference.
    ratchet down, run `lawgate readability-baseline` and review the counts.
    Tell contributors in `AGENTS.md` to read the relevant laws and run the
    gate before committing.
-5. Put the CI template in the protected workflow or pipeline policy and
-   require its jobs and code-owner approval through branch protection. The
-   GitHub template checks the PR merge candidate, supports `merge_group`, and
-   pins every action to a commit SHA with its release tag in a comment. The
-   GitLab template requires merged-results pipelines. For Node modules, use a
-   GitLab job image with Go and Node.js. Review the output of
-   `lawgate codeowners --owner @name` when rule files change. Approval is
-   recorded by the platform review. The Git trailer is an audit note.
+5. Commit the CI template `init` wrote. It needs only the free plans of
+   GitHub and GitLab. To check the owner's approval, set
+   `"require_approval": true` in `lawgate.json`: `lawgate rule-changes`
+   then reads the owner's approval of the pull request or merge request
+   from the platform's API whenever a change touches a rule file (see
+   [The owner's approval in CI](#the-owners-approval-in-ci)). On GitLab,
+   turn on "Pipelines must succeed" and add the `LAWGATE_API_TOKEN`
+   variable. The GitHub template checks the PR merge candidate and pins
+   every action to a commit SHA with its release tag in a comment. For Node
+   modules, use a GitLab job image with Go and Node.js. Regenerate
+   CODEOWNERS with `lawgate codeowners` when rule files change: it is the
+   list of rule files. The Git trailer is an audit note.
 
 ## Commands
 
@@ -49,7 +53,7 @@ reference.
 | `rule-files [--root DIR]` | Lists rule files: configuration, the baseline, law documents, gate files, CI files, and the source and tests that declare or enforce rules with everything they reach. A file that cannot be parsed is listed and reported (exit 1). |
 | `codeowners [--root DIR] [--owner @name] [--platform github\|gitlab] [--fallback]` | Prints exact CODEOWNERS entries for the current rule files, after the platform's fallback block with `--fallback`. |
 | `check-codeowners [--root DIR] [--owner @name] [--platform github\|gitlab] [--base REF]` | Requires owner coverage in the active CODEOWNERS and, with `--base`, also in the base ref's active CODEOWNERS. |
-| `rule-changes [--root DIR] BASE HEAD` | Audits rule changes from the merge base through HEAD, including renames and merges, and reports approval trailers. |
+| `rule-changes [--root DIR] [--require-approval] BASE HEAD` | Audits rule changes from the merge base through HEAD, including renames and merges, and reports approval trailers. When `require_approval` is true in `lawgate.json` at BASE, or with `--require-approval`, it also fails, in CI, unless `lawgate.json`'s owner approved (or authored) the pull request or merge request behind every rule-file change. |
 
 `--root` defaults to the current directory, and relative `--out` paths are
 relative to that root. The ownership commands take the owner and platform
@@ -59,7 +63,7 @@ cannot name its own reviewer. lawgate has no built-in owner.
 
 ## Rule files and CODEOWNERS
 
-A rule file needs the owner's review. This includes every configured law
+A rule file needs the owner's approval. This includes every configured law
 document, `lawgate.json`, the baseline, `gate_files`, CI files, and
 CODEOWNERS. Repository scripts and Go packages invoked by configured gate
 commands also need coverage, including `generate_check`. Lawgate follows
@@ -143,8 +147,62 @@ ways to bootstrap one:
   such as `/workers/ @owner`) first, then the rule file.
 
 The first change that adds lawgate has no base `lawgate.json` or
-CODEOWNERS: the owner reviews and merges it before making the CI jobs
-required.
+CODEOWNERS: the owner reviews and merges it.
+
+## The owner's approval in CI
+
+Required code-owner review, branch protection, rulesets and required checks
+are paid features on the free plans of GitHub and GitLab. lawgate does not
+use them. Instead, when `"require_approval": true` is in `lawgate.json` at
+BASE (or `--require-approval` is passed), `lawgate rule-changes BASE HEAD`
+reads the owner's approval from the platform's API whenever a commit in
+BASE..HEAD changes a rule file. The check is off by default: then the
+command only prints the audit and needs no token or CI variables. It is
+read at BASE, so a change cannot switch it off for itself, and a change
+that switches it on takes effect from the next change.
+
+- The owner is `lawgate.json`'s `owner` at BASE, so a change cannot name
+  its own approver. It must be a user: a team or group (`@org/team`) cannot
+  approve and is refused.
+- **A pull request or merge request the owner authored counts as
+  approved** (owner decision 2026-11-24), and the verdict says so
+  ("authored by @owner: counts as approved").
+- **GitHub pull request** (`pull_request`, `pull_request_review`): the
+  owner's latest review that decides must be `APPROVED` on the pull
+  request's head commit. A later request for changes or a dismissal wins;
+  a comment decides nothing.
+- **GitLab merge request**: the owner must be in the merge request's
+  approvals, and the owner's latest "approved this merge request" note
+  must be newer than the latest push (GitLab Free keeps an approval when
+  commits are pushed) and not followed by "unapproved".
+- **Push to the default branch**: every rule-file commit must come from a
+  merged pull request or merge request the owner approved at its last
+  head, or authored. A rule-file commit pushed without one fails, even one
+  the owner wrote. A merge queue run (`merge_group`) reads no approval:
+  each pull request was judged before it joined the queue, and the push
+  judges what lands.
+- It fails closed: outside CI, or without the token, it names the missing
+  variable and fails.
+
+| Platform | Variables it reads |
+| --- | --- |
+| GitHub Actions | `GITHUB_EVENT_NAME`, `GITHUB_EVENT_PATH`, `GITHUB_REPOSITORY`, `GITHUB_API_URL`, and `GITHUB_TOKEN` (pass `${{ github.token }}`, with `permissions: pull-requests: read`) |
+| GitLab CI | `CI_MERGE_REQUEST_IID` or `CI_PIPELINE_SOURCE=push` with `CI_COMMIT_BRANCH` and `CI_DEFAULT_BRANCH`, `CI_PROJECT_ID`, `CI_API_V4_URL`, and `LAWGATE_API_TOKEN` (a masked variable holding a `read_api` token; `CI_JOB_TOKEN` cannot read approvals, notes or versions) |
+
+What it buys depends on the plan. On GitLab Free, "Pipelines must succeed"
+blocks the merge while the approval is missing; approving starts no
+pipeline, so rerun the job after the owner approves. On GitHub Free private
+repositories nothing can block a merge: a missing approval turns the pull
+request check red, and the run on the push to the default branch names any
+rule-file commit that landed without it. That is detection, not
+prevention. Where rulesets are available, also require the jobs.
+
+Two limits remain. While agents push and open pull requests or merge
+requests with the owner's credentials, their changes look authored by the
+owner and pass this check; giving agents their own account closes that.
+And on the free plans nothing stops a change from editing the CI file to
+drop the check from its own run: the CI file is a rule file, so the audit
+lists that change, but only a person reading it sees it.
 
 ## `lawgate.json`
 
@@ -161,6 +219,7 @@ repository root. Command arguments are arrays of strings run from the module.
 | `outside_includes` | array of strings | Optional clean absolute directories outside the repository that the owner approves for cgo include directories and headers. Not `/`, the repository root or a directory holding it. Each is noted once instead of reported. |
 | `rule_packages` | array of `{"path", "names"}` | Optional Go packages whose declarations are rules, such as a product's own state machine package. Using one of `names` (every name when empty) makes a file a rule file; a `Machine` name also marks the module as declaring machines. |
 | `platform` | `"github"` or `"gitlab"` | Optional CODEOWNERS platform. |
+| `require_approval` | boolean | Optional, default `false`. When true at BASE, `rule-changes` checks in CI that the owner approved (or authored) the pull request or merge request behind every rule-file change. Requires `owner` (a user) and `platform`. |
 | `readability` | object | Optional Go readability ratchet configuration. |
 | `readability.baseline` | string | Required with `readability`. Path to the protected baseline. An empty file allows zero findings. |
 | `readability.include` | array of strings | Optional repository-relative globs. Defaults to all Go files in the listed Go modules. |

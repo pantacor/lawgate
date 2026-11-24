@@ -1,15 +1,34 @@
-# Install in the protected repository that supplies the required workflow.
-# Require both jobs in the target repository's ruleset and require code-owner review.
-# Set the lawgate version below to the published release selected by the owner.
+# Install as .github/workflows/lawgate.yml in the repository it gates.
+# With "require_approval": true in lawgate.json, `lawgate rule-changes`
+# reads the owner's approval of the pull request from the GitHub API
+# whenever a change touches a rule file; a pull request the owner opened
+# counts as approved. While agents push and open pull requests with the
+# owner's credentials, their changes look authored by the owner and pass:
+# give agents their own account to close that. Off, it only prints the
+# audit. On GitHub Free private repositories, required reviews, rulesets
+# and required checks are paid features, so nothing blocks a merge: a
+# missing approval turns the review-rules check red on the pull request,
+# and the run on a push to the default branch names every rule-file commit
+# that landed without it (detected, not prevented). Where rulesets are
+# available, also require both jobs. The review trigger and the
+# pull-requests permission are harmless while the check is off.
+# Set the default branch under push and the lawgate version below to the
+# published release selected by the owner.
 name: Law gate
 on:
   pull_request:
+  # An approval or a dismissal runs the approval check again (when on).
+  pull_request_review:
+    types: [submitted, dismissed]
   merge_group:
+  push:
+    branches: [main]
 permissions:
   contents: read
+  pull-requests: read
 
 env:
-  LAW_GATE_VERSION: v0.1.0
+  LAW_GATE_VERSION: v0.1.1
 
 jobs:
   review-rules:
@@ -28,17 +47,26 @@ jobs:
       - name: Install pinned verifier
         working-directory: ${{ runner.temp }}
         run: GOBIN="$RUNNER_TEMP" GOWORK=off go install "github.com/pantacor/lawgate/cmd/lawgate@$LAW_GATE_VERSION"
-      - name: Check code owners and audit history
+      - name: Check code owners, audit history and the owner's approval
         env:
-          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          # On a push the base is the commit before the push; a new branch
+          # has none, so there is no history to judge.
+          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          LAW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          test -n "$LAW_BASE"
           test -n "$LAW_HEAD"
+          # Only a push may lack a base; a pull request without one fails.
+          if [ "$GITHUB_EVENT_NAME" != push ]; then test -n "$LAW_BASE"; fi
+          case "$LAW_BASE" in ""|0000000000000000000000000000000000000000) LAW_BASE=$LAW_HEAD ;; esac
           "$RUNNER_TEMP/lawgate" check-codeowners --base "$LAW_BASE"
+          # lawgate.json's require_approval at the base decides whether the
+          # owner's approval is checked.
           "$RUNNER_TEMP/lawgate" rule-changes "$LAW_BASE" "$LAW_HEAD"
 
   check-laws:
+    # A review changes no code: the laws are not run again for it.
+    if: github.event_name != 'pull_request_review'
     runs-on: ubuntu-latest
     steps:
       # Default checkout tests the merge candidate rather than the unmerged PR head.
@@ -59,9 +87,10 @@ jobs:
       - name: Run law checks
         id: laws
         env:
-          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          LAW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
-          test -n "$LAW_BASE"
+          if [ "$GITHUB_EVENT_NAME" != push ]; then test -n "$LAW_BASE"; fi
+          case "$LAW_BASE" in ""|0000000000000000000000000000000000000000) LAW_BASE=$GITHUB_SHA ;; esac
           status=0
           directory=$("$RUNNER_TEMP/lawgate" check --base "$LAW_BASE" --out "$RUNNER_TEMP/lawgate-reports") || status=$?
           printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"

@@ -28,7 +28,8 @@ type Commit struct {
 }
 
 // The audit trailers a rule change carries (rulechanges.Audit reads them).
-// Approval itself is the owner's review on the platform (CODEOWNERS).
+// Approval itself is the owner's approval on the pull or merge request,
+// which lawgate rule-changes --require-approval checks in CI.
 const (
 	RuleChangeTrailer   = "Rule-change-approved-by"
 	RuleApprovesTrailer = "Rule-change-approves"

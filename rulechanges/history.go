@@ -25,10 +25,32 @@ type auditTrail struct {
 	approves   []string
 }
 
-func Audit(root, base, head string, output io.Writer) (err error) {
+// Audit writes the audit of the rule changes from the merge base of BASE and
+// HEAD through HEAD, and fails on an audit trailer that breaks the rules.
+func Audit(root, base, head string, output io.Writer) error {
+	_, err := AuditRange(root, base, head, output)
+	return err
+}
+
+// RuleCommit is a commit of an audited range that changed rule files.
+type RuleCommit struct {
+	ID    string
+	Files []string
+}
+
+// AuditResult is what AuditRange found: HEAD's commit ID and, oldest first,
+// the commits that changed a rule file.
+type AuditResult struct {
+	Head    string
+	Changes []RuleCommit
+}
+
+// AuditRange is Audit that also returns the commits that changed a rule
+// file, so a caller can judge them without classifying the history again.
+func AuditRange(root, base, head string, output io.Writer) (result AuditResult, err error) {
 	batch, err := startBlobs(root)
 	if err != nil {
-		return err
+		return AuditResult{}, err
 	}
 	defer func() {
 		err = errors.Join(err, batch.close())
@@ -38,22 +60,47 @@ func Audit(root, base, head string, output io.Writer) (err error) {
 		command: func(args ...string) ([]byte, error) { return gitCommand(root, args...) },
 		blobs:   batch.read,
 	}
-	return repo.audit(base, head, output)
+	return repo.auditRange(base, head, output)
 }
 
 func (repo history) audit(base, head string, output io.Writer) error {
+	_, err := repo.auditRange(base, head, output)
+	return err
+}
+
+func (repo history) auditRange(base, head string, output io.Writer) (AuditResult, error) {
 	revisions, err := repo.revisions(base, head)
 	if err != nil {
-		return err
+		return AuditResult{}, err
 	}
+	headID, err := repo.commitID(head)
+	if err != nil {
+		return AuditResult{}, err
+	}
+	result := AuditResult{Head: headID}
 	cache := make(map[string]map[string]bool)
 	var auditErrors error
 	for _, commit := range revisions {
-		if err := repo.auditCommit(commit, cache, output); err != nil {
-			auditErrors = errors.Join(auditErrors, err)
+		change, err := repo.auditRevision(commit, cache, output)
+		auditErrors = errors.Join(auditErrors, err)
+		if len(change.Files) > 0 {
+			result.Changes = append(result.Changes, change)
 		}
 	}
-	return auditErrors
+	return result, auditErrors
+}
+
+// auditRevision audits one commit and lists the rule files it changed. The
+// second classification reads the trees auditCommit cached, and its error
+// repeats auditCommit's, so only one of them is returned.
+func (repo history) auditRevision(commit revision, cache map[string]map[string]bool, output io.Writer) (RuleCommit, error) {
+	auditErr := repo.auditCommit(commit, cache, output)
+	files, err := repo.changedRules(commit, cache)
+	change := RuleCommit{ID: commit.id, Files: files}
+	if auditErr != nil {
+		return change, auditErr
+	}
+	return change, err
 }
 
 func (repo history) revisions(base, head string) ([]revision, error) {

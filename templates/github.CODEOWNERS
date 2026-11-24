@@ -1,4 +1,5 @@
-# Require code-owner review on the target branch. The fallback covers new
-# rule files until the generated block lists them.
+# The rule files the owner approves. With require_approval on, CI checks
+# the approval on the pull request (lawgate rule-changes). The fallback
+# covers new rule files until the generated block lists them.
 * @your-org/law-owners
 

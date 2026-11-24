@@ -28,7 +28,7 @@ The extension activates in a workspace that contains a `lawgate.json`.
 The extension starts the language server in this order:
 
 1. The binary named by the `lawgate.serverPath` setting.
-2. `lawgate` from `PATH` (`go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.0`).
+2. `lawgate` from `PATH` (`go install github.com/pantacor/lawgate/cmd/lawgate@v0.1.1`).
 3. `go run github.com/pantacor/lawgate/cmd/lawgate review -lsp`, run from the
    workspace folder. This uses the version your module pins in `go.mod`, so the
    server always matches the repository. It needs a Go toolchain and takes a
