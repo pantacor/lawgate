@@ -110,6 +110,159 @@
   </div>
 </section>
 
+<section class="section section-alt" id="examples">
+  <div class="wrap">
+    <p class="eyebrow">Examples</p>
+    <h2 class="section-title">A law, its code and its proof.</h2>
+    <p class="section-lede">Every law has three parts. A person writes the sentence in <code>LAWS.md</code>. Code checks it. The gate then demands proof that the check can fail. Here are the three kinds of law.</p>
+
+    <div class="ex">
+      <div class="tabs" role="tablist" aria-label="Kind of law">
+        <button type="button" role="tab" id="tab-machine" aria-controls="panel-machine" aria-selected="true" data-tab="machine">Machine law</button>
+        <button type="button" role="tab" id="tab-test" aria-controls="panel-test" aria-selected="false" data-tab="test">Test law</button>
+        <button type="button" role="tab" id="tab-kernel" aria-controls="panel-kernel" aria-selected="false" data-tab="kernel">Kernel law</button>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-machine" aria-labelledby="tab-machine" data-tab="machine">
+        <h3 class="panel-title">Machine law</h3>
+        <p class="ex-note">A law over a worker's declared control flow. From <a href="{{ site.Params.repo }}/tree/main/example">the example module</a>.</p>
+        <div class="ex-grid">
+          <figure class="ex-card ex-law">
+            <figcaption><span class="step-n">1</span>The law <span class="mono">example/LAWS.md</span></figcaption>
+<pre><code>## validate-before-store
+
+Every path through the `worker` machine
+validates the job before storing the
+completed result.
+
+- Source: `../README.md`, *Example adopting
+  module* (agreed 2026-11-20).
+- Enforced by: machine `worker`
+- Status: agreed 2026-11-20</code></pre>
+          </figure>
+          <figure class="ex-card ex-code">
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">example/machine.go</span></figcaption>
+<pre><code>machine.Law{
+	Name: "validate-before-store",
+	<span class="c">// Check reads the declared graph.</span>
+	Check: func(m *machine.Machine) []string {
+		if m.AlwaysBefore("validate-input", "store-done") {
+			return nil
+		}
+		return []string{"step validate-input does not always precede store-done"}
+	},
+	<span class="c">// Witness adds an edge that skips validation.</span>
+	Witness: func(m *machine.Machine) {
+		bypass := machine.Edge{On: "skip", To: "complete", Kind: machine.EdgeNext}
+		m.States[0].Edges = append(m.States[0].Edges, bypass)
+	},
+}</code></pre>
+          </figure>
+          <figure class="ex-card ex-proof">
+            <figcaption><span class="step-n">3</span>The proof</figcaption>
+<pre><code><span class="p">$</span> go run ./cmd/machine -laws
+## Laws
+
+<span class="ok">✓ 1 machine, 2 laws hold.</span></code></pre>
+            <p>The law holds on the real machine. The gate also applies the witness to a copy, and the law must report a violation there. A law with no witness, or a witness that breaks nothing, is refused.</p>
+          </figure>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" data-tab="test">
+        <h3 class="panel-title">Test law</h3>
+        <p class="ex-note">A law enforced by a test, with a hook that lets the gate switch the behaviour off. From <a href="{{ site.Params.repo }}/tree/main/example">the example module</a>.</p>
+        <div class="ex-grid">
+          <figure class="ex-card ex-law">
+            <figcaption><span class="step-n">1</span>The law <span class="mono">example/LAWS.md</span></figcaption>
+<pre><code>## rejects-empty-payload
+
+Processing a job with an empty payload
+fails before writing a completed result.
+
+- Source: `../README.md`, *Example adopting
+  module* (agreed 2026-11-20).
+- Enforced by: test `TestRejectsEmptyPayload`
+- Status: agreed 2026-11-20</code></pre>
+          </figure>
+          <figure class="ex-card ex-code">
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">worker.go, worker_test.go</span></figcaption>
+<pre><code><span class="c">// The behaviour, guarded by a bite hook.</span>
+func isValidJob(job Job) bool {
+	hasID := strings.TrimSpace(job.ID) != ""
+	hasPayload := bite.Off("rejects-empty-payload") || strings.TrimSpace(job.Payload) != ""
+	return hasID &amp;&amp; hasPayload
+}
+
+<span class="c">// TestRejectsEmptyPayload enforces rejects-empty-payload.</span>
+func TestRejectsEmptyPayload(t *testing.T) {
+	job := Job{ID: "job-1", Payload: "   "}
+	store := &amp;memoryStore{job: job}
+	if err := Process("job-1", store); err == nil {
+		t.Fatal("expected error for empty payload, got nil")
+	}
+	if store.stored != 0 {
+		t.Fatalf("StoreDone called %d times, want 0", store.stored)
+	}
+}</code></pre>
+          </figure>
+          <figure class="ex-card ex-proof">
+            <figcaption><span class="step-n">3</span>The proof</figcaption>
+<pre><code><span class="c"># verdicts in the gate's report</span>
+<span class="ok">✓</span> example/TestRejectsEmptyPayload
+<span class="ok">✓</span> laws-bite (rejects-empty-payload:
+  example/LAWS.md, TestRejectsEmptyPayload)</code></pre>
+            <p>The test ran and names its law. Then the gate reran it twice in a <code>lawgate_bite</code> build: once selecting a law that does not exist, where it must pass, and once with <code>LAWGATE_BITE=rejects-empty-payload</code>, where it must fail.</p>
+          </figure>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-kernel" aria-labelledby="tab-kernel" data-tab="kernel">
+        <h3 class="panel-title">Kernel law</h3>
+        <p class="ex-note">A law about a small pure function, checked on every input inside declared bounds. An illustration: this kernel is not in the example module.</p>
+        <div class="ex-grid">
+          <figure class="ex-card ex-law">
+            <figcaption><span class="step-n">1</span>The law <span class="mono">LAWS.md</span></figcaption>
+<pre><code>## revisions-only-grow
+
+No revision number is lower than or equal
+to the one before it.
+
+- Source: owner decision 2026-11-20
+- Enforced by: test `TestRevisionsOnlyGrow`
+- Status: agreed 2026-11-20</code></pre>
+          </figure>
+          <figure class="ex-card ex-code">
+            <figcaption><span class="step-n">2</span>The laws code <span class="mono">revision_test.go</span></figcaption>
+<pre><code><span class="c">// TestRevisionsOnlyGrow enforces revisions-only-grow.</span>
+func TestRevisionsOnlyGrow(t *testing.T) {
+	grows := prove.Law[int]{
+		Name: "revisions-only-grow",
+		Holds: func(current int) error {
+			if nextRevision(current) &gt; current {
+				return nil
+			}
+			return fmt.Errorf("revision %d did not grow", current)
+		},
+	}
+	<span class="c">// The bounds are declared here: 0 to 1000, inclusive.</span>
+	prove.Check(t, prove.Ints(0, 1000), grows)
+}</code></pre>
+          </figure>
+          <figure class="ex-card ex-proof">
+            <figcaption><span class="step-n">3</span>The proof</figcaption>
+<pre><code><span class="p">$</span> go test -v -run TestRevisionsOnlyGrow
+<span class="ok">prove: 1 laws held on all 1001 inputs</span>
+--- PASS: TestRevisionsOnlyGrow (0.00s)</code></pre>
+            <p>Every input in the bounds was checked, so inside them the result is a proof and not a sample. An empty input space or an empty list of laws fails the test. The kernel still needs a <code>bite.Off</code> hook, like any test law.</p>
+          </figure>
+        </div>
+      </div>
+    </div>
+    <p class="foot-note">The <a href="{{ "docs/concepts/" | relURL }}">concepts guide</a> explains witnesses, bites and kernels. The <a href="{{ "docs/user_guide/" | relURL }}#write-lawsmd">user guide</a> has the full <code>LAWS.md</code> format.</p>
+  </div>
+</section>
+
 <section class="section section-band" id="pantacor">
   <div class="wrap band-grid">
     <div>

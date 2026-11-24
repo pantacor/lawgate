@@ -1,4 +1,4 @@
-// lawgate site: the gate card demo in the hero, and copy buttons.
+// lawgate site: the gate card demo in the hero, the example tabs, and copy buttons.
 const root = document.documentElement;
 root.classList.remove("no-js");
 root.classList.add("js");
@@ -78,6 +78,32 @@ function gateCard() {
   io.observe(list);
 }
 
+/* ---------- Example tabs: machine law, test law, kernel law ---------- */
+function tabs() {
+  const buttons = [...document.querySelectorAll('.tabs [role="tab"]')];
+  const panels = [...document.querySelectorAll('.panel[role="tabpanel"]')];
+  if (!buttons.length) return;
+  const select = (name, focus) => {
+    buttons.forEach((button) => {
+      const on = button.dataset.tab === name;
+      button.setAttribute("aria-selected", String(on));
+      button.tabIndex = on ? 0 : -1;
+      if (on && focus) button.focus();
+    });
+    panels.forEach((panel) => panel.setAttribute("aria-hidden", String(panel.dataset.tab !== name)));
+  };
+  buttons.forEach((button, i) => {
+    button.addEventListener("click", () => select(button.dataset.tab));
+    button.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      const next = buttons[(i + step + buttons.length) % buttons.length];
+      select(next.dataset.tab, true);
+    });
+  });
+  select(buttons[0].dataset.tab);
+}
+
 /* ---------- Copy buttons ---------- */
 function copyButtons() {
   document.querySelectorAll("[data-copy]").forEach((btn) => {
@@ -100,4 +126,5 @@ function copyButtons() {
 }
 
 gateCard();
+tabs();
 copyButtons();
