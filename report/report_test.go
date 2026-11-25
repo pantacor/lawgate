@@ -184,3 +184,68 @@ func TestFailureCountAgreesInNumber(t *testing.T) {
 		t.Fatalf("headlines must agree in number:\n%s\n%s", one, two)
 	}
 }
+
+// The page lists what needs attention first, broken before pending, and
+// folds what holds.
+func TestHTMLPutsWhatNeedsAttentionFirst(t *testing.T) {
+	runs := []LawRun{
+		holdingRun(),
+		gateRun(pendingVerdict("gap-law", "needs a fixture", "needs a fixture")),
+		lawRun("mod", "worker", verdict("broken-law", "x is wrong")),
+	}
+	data := NewHTMLData(runs, Meta{})
+	var names []string
+	for _, item := range data.Attention {
+		names = append(names, item.Name)
+	}
+	if got := strings.Join(names, ","); got != "broken-law,gap-law" {
+		t.Fatalf("attention must list the broken law, then the pending one, got %s", got)
+	}
+	if data.MachineCards[0].Name != "worker" {
+		t.Fatalf("the machine with a broken law must come first, got %q", data.MachineCards[0].Name)
+	}
+	page, err := HTML(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(page)
+	attention, machines := strings.Index(text, "Needs attention"), strings.Index(text, `aria-label="Machines"`)
+	if attention < 0 || attention > machines {
+		t.Fatalf("Needs attention must come before the machines")
+	}
+	if !strings.Contains(text, `<details class="holding">`) {
+		t.Fatalf("laws that hold must be folded")
+	}
+}
+
+// Gate checks drop the prefix they share and group by package.
+func TestGateChecksGroupByPackage(t *testing.T) {
+	run := gateRun(
+		verdict("example.com/app/modules/api/TestA"),
+		verdict("example.com/app/modules/api/TestB/case_one"),
+		verdict("example.com/app/modules/storage/TestC"),
+		verdict("module inventory"),
+		verdict("laws-bite (some-law: LAWS.md, subject)"),
+	)
+	card := NewHTMLData([]LawRun{run}, Meta{}).Gates[0]
+	if card.Prefix != "example.com/app/modules/" {
+		t.Fatalf("prefix = %q", card.Prefix)
+	}
+	got := map[string][]string{}
+	for _, group := range card.Groups {
+		for _, check := range group.Checks {
+			got[group.Name] = append(got[group.Name], check.Name)
+		}
+	}
+	want := map[string][]string{
+		"api":        {"TestA", "TestB/case_one"},
+		"storage":    {"TestC"},
+		"repository": {"module inventory"},
+		"laws-bite":  {"(some-law: LAWS.md, subject)"},
+	}
+	for name, checks := range want {
+		if strings.Join(got[name], ",") != strings.Join(checks, ",") {
+			t.Errorf("group %q = %v, want %v", name, got[name], checks)
+		}
+	}
+}

@@ -7,6 +7,24 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-25
+
+The HTML report listed every law and gate check at full length: Fleet's
+ran to 93,000 px for a run where nothing broke. It now leads with what
+needs attention and folds what holds (5,600 px for the same run).
+
+### Changed
+
+- `report`: the page starts with **Needs attention**, every broken or
+  pending item grouped by reason, broken groups open and long pending
+  groups folded.
+- `report`: machines are sorted worst first, and the laws that hold fold
+  under one line.
+- `report`: gate checks take the full width after the machines; the prefix
+  the Go tests share is shown once and cut from their names, and the checks
+  that hold are grouped by package, folded, with a count. Filtering opens
+  the folded parts that match.
+
 ## [0.1.1] - unreleased
 
 The adopters are private repositories on the free plans of GitHub and

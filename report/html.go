@@ -46,24 +46,32 @@ type htmlMachine struct {
 	Verdict    string // the pill's label
 	Tone       string // the pill's tone
 	Laws       []htmlLaw
+	Attention  []htmlLaw   // broken or pending, shown open
+	Holding    []htmlLaw   // laws that hold, folded away
+	Prefix     string      // the module prefix cut from gate check names
+	Groups     []htmlGroup // gate checks that hold, by package
 }
 
 // HTMLData is the page's model.
 type HTMLData struct {
-	Product   string
-	Generated string
-	Commit    string
-	Reproduce string
-	Machines  int
-	Laws      int
-	Checks    int
-	Broken    int
-	Pending   int
-	Failed    int
-	Headline  string
-	Verdict   string
-	Tone      string
-	Cards     []htmlMachine
+	Product      string
+	Generated    string
+	Commit       string
+	Reproduce    string
+	Machines     int
+	Laws         int
+	Checks       int
+	Broken       int
+	Pending      int
+	Failed       int
+	Headline     string
+	Verdict      string
+	Tone         string
+	Cards        []htmlMachine
+	Attention    []htmlAttention // every broken or pending item, worst first
+	Reasons      []htmlReason    // the same items, by reason
+	MachineCards []htmlMachine   // machine cards, worst first
+	Gates        []htmlMachine   // gate check cards
 }
 
 // pageVerdict is how the page states an outcome.
@@ -108,8 +116,18 @@ func NewHTMLData(runs []LawRun, meta Meta) HTMLData {
 		data.Generated = meta.Generated.Format("2 Jan 2006, 15:04 MST")
 	}
 	for _, run := range runs {
-		data.Cards = append(data.Cards, htmlCard(run))
+		card := htmlCard(run)
+		data.Cards = append(data.Cards, card)
+		data.Attention = append(data.Attention, attentionOf(card)...)
+		if card.GateChecks {
+			data.Gates = append(data.Gates, card)
+			continue
+		}
+		data.MachineCards = append(data.MachineCards, card)
 	}
+	sortAttention(data.Attention)
+	data.Reasons = groupAttention(data.Attention)
+	sortCards(data.MachineCards)
 	return data
 }
 
@@ -132,6 +150,11 @@ func htmlCard(run LawRun) htmlMachine {
 	card.Verdict, card.Tone = cardVerdict(card)
 	for _, verdict := range run.Verdicts {
 		card.Laws = append(card.Laws, htmlLawFor(verdict))
+	}
+	card.Attention, card.Holding = splitLaws(card.Laws)
+	if card.GateChecks {
+		card.Prefix, card.Groups = groupChecks(card.Holding)
+		card.Attention = trimPrefix(card.Prefix, card.Attention)
 	}
 	return card
 }

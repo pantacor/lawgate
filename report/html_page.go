@@ -64,37 +64,66 @@ const htmlPage = `<!doctype html>
 		</div>
 	</div>
 
-	<main class="grid" id="machines">
-	{{range .Cards}}
-		<article class="card machine" data-verdict="{{if or .Failure .Broken}}broken{{else if .Pending}}pending{{else}}ok{{end}}" data-name="{{.Name}}">
-			<header class="machine__head">
-				<div class="machine__title">
-					{{if .Module}}<p class="eyebrow">{{.Module}}</p>{{end}}
-					<h2>{{.Name}}</h2>
-					<code class="machine__source">{{.Source}}</code>
-				</div>
-				<div class="machine__meta">
-					<span class="count">{{.Count}} {{if .GateChecks}}checks{{else if eq .Count 1}}law{{else}}laws{{end}}</span>
-					<span class="status-pill status-pill--{{.Tone}}">{{.Verdict}}</span>
-				</div>
-			</header>
-			{{if .Failure}}<p class="machine__failure">Could not be checked: {{.Failure}}</p>{{end}}
-			<ul class="laws">
-			{{range .Laws}}
-				<li class="law law--{{.Tone}}">
-					<div class="law__row">
-						<span class="law__name">{{.Name}}</span>
-						<span class="status-pill status-pill--{{.Tone}}">{{.State}}</span>
-					</div>
-					<p class="law__doc">{{.Doc}}</p>
-					{{if .Pending}}<p class="law__doc">{{.Pending}}</p>{{end}}
-					{{if .Violations}}<pre class="violations">{{join .Violations "\n"}}</pre>{{end}}
-				</li>
-			{{end}}
-			</ul>
-		</article>
+	{{if .Attention}}
+	<section class="section" id="attention" aria-label="Needs attention">
+		<h2 class="section__title">Needs attention <span class="count">{{len .Attention}}</span></h2>
+		<div class="card attention">
+		{{range .Reasons}}
+			<details class="reason reason--{{.Tone}}"{{if .Open}} open{{end}}>
+				<summary><span class="status-pill status-pill--{{.Tone}}">{{len .Items}}</span><span class="reason__title">{{.Title}}</span></summary>
+				<ul class="laws">
+				{{range .Items}}
+					<li class="law law--{{.Tone}}">
+						<div class="law__row">
+							<span class="law__name">{{.Name}}</span>
+							<span class="law__where">{{.Where}}</span>
+						</div>
+						{{if .Detail}}<p class="law__doc">{{.Detail}}</p>{{end}}
+						{{if .Violations}}<pre class="violations">{{join .Violations "\n"}}</pre>{{end}}
+					</li>
+				{{end}}
+				</ul>
+			</details>
+		{{end}}
+		</div>
+	</section>
 	{{end}}
-	</main>
+
+	{{if .MachineCards}}
+	<section class="section" aria-label="Machines">
+		<h2 class="section__title">Machines <span class="count">{{len .MachineCards}}</span></h2>
+		<main class="grid" id="machines">
+		{{range .MachineCards}}
+			<article class="card machine" data-verdict="{{template "verdict" .}}" data-name="{{.Name}}">
+				{{template "head" .}}
+				{{if .Attention}}<ul class="laws">{{range .Attention}}{{template "law" .}}{{end}}</ul>{{end}}
+				{{if .Holding}}<details class="holding"><summary>{{len .Holding}} {{if eq (len .Holding) 1}}law holds{{else}}laws hold{{end}}</summary><ul class="laws">{{range .Holding}}{{template "law" .}}{{end}}</ul></details>{{end}}
+			</article>
+		{{end}}
+		</main>
+	</section>
+	{{end}}
+
+	{{if .Gates}}
+	<section class="section" aria-label="Gate checks">
+		<h2 class="section__title">Gate checks</h2>
+		{{range .Gates}}
+			<article class="card machine machine--wide" data-verdict="{{template "verdict" .}}" data-name="{{.Name}}">
+				{{template "head" .}}
+				{{if .Prefix}}<p class="machine__prefix">Names drop the shared prefix <code>{{.Prefix}}</code></p>{{end}}
+				{{if .Attention}}<p class="machine__prefix"><a href="#attention">{{len .Attention}} {{if eq (len .Attention) 1}}check needs{{else}}checks need{{end}} attention</a>, listed at the top of the page.</p>{{end}}
+				{{if .Groups}}<div class="groups">
+				{{range .Groups}}
+					<details class="group">
+						<summary><span class="group__name">{{.Name}}</span><span class="count">{{len .Checks}} hold</span></summary>
+						<ul class="checks">{{range .Checks}}<li>{{.Name}}</li>{{end}}</ul>
+					</details>
+				{{end}}
+				</div>{{end}}
+			</article>
+		{{end}}
+	</section>
+	{{end}}
 
 	<p class="empty" id="empty" hidden>No machine or law matches the filter.</p>
 
@@ -133,6 +162,9 @@ const htmlPage = `<!doctype html>
 			var ok = (show === "all" || verdict === show) && (!q || text.indexOf(q) !== -1);
 			card.hidden = !ok;
 			if (ok) { visible++; }
+			card.querySelectorAll("details").forEach(function (part) {
+				part.open = !!q && part.textContent.toLowerCase().indexOf(q) !== -1;
+			});
 		});
 		empty.hidden = visible !== 0;
 	}
@@ -152,6 +184,28 @@ const htmlPage = `<!doctype html>
 </script>
 </body>
 </html>
+{{define "verdict"}}{{if or .Failure .Broken}}broken{{else if .Pending}}pending{{else}}ok{{end}}{{end}}
+{{define "head"}}<header class="machine__head">
+	<div class="machine__title">
+		{{if .Module}}<p class="eyebrow">{{.Module}}</p>{{end}}
+		<h2>{{.Name}}</h2>
+		{{if .Source}}<code class="machine__source">{{.Source}}</code>{{end}}
+	</div>
+	<div class="machine__meta">
+		<span class="count">{{.Count}} {{if .GateChecks}}checks{{else if eq .Count 1}}law{{else}}laws{{end}}</span>
+		<span class="status-pill status-pill--{{.Tone}}">{{.Verdict}}</span>
+	</div>
+</header>
+{{if .Failure}}<p class="machine__failure">Could not be checked: {{.Failure}}</p>{{end}}{{end}}
+{{define "law"}}<li class="law law--{{.Tone}}">
+	<div class="law__row">
+		<span class="law__name">{{.Name}}</span>
+		<span class="status-pill status-pill--{{.Tone}}">{{.State}}</span>
+	</div>
+	{{if .Doc}}<p class="law__doc">{{.Doc}}</p>{{end}}
+	{{if .Pending}}<p class="law__doc">{{.Pending}}</p>{{end}}
+	{{if .Violations}}<pre class="violations">{{join .Violations "\n"}}</pre>{{end}}
+</li>{{end}}
 `
 
 // htmlCSS carries the Pantacor design language: one purple accent, slate
@@ -330,6 +384,28 @@ h1, h2 { margin: 0; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; }
 .machine { display: flex; flex-direction: column; overflow: hidden; }
+.machine--wide { overflow: hidden; }
+.section { margin-top: 1.75rem; }
+.section__title { display: flex; gap: 0.5rem; align-items: baseline; margin: 0 0 0.75rem; font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.attention { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.law__where { margin: 0; flex-shrink: 0; max-width: 45%; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.machine__prefix { margin: 0; padding: 0.5rem 1.125rem; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.reason > summary, .holding > summary, .group > summary { display: flex; gap: 0.5rem; align-items: baseline; justify-content: space-between; padding: 0.625rem 1.125rem; cursor: pointer; list-style: none; font-size: 12.5px; color: var(--text-muted); }
+.reason > summary::-webkit-details-marker, .holding > summary::-webkit-details-marker, .group > summary::-webkit-details-marker { display: none; }
+.reason > summary::before, .holding > summary::before, .group > summary::before { content: "\25B8"; margin-right: 0.375rem; transition: transform 0.15s; }
+.reason[open] > summary::before, .holding[open] > summary::before, .group[open] > summary::before { transform: rotate(90deg); }
+.holding > summary, .reason > summary { justify-content: flex-start; }
+.reason { border-bottom: 1px solid var(--border); }
+.reason:last-child { border-bottom: 0; }
+.reason[open] > summary { border-bottom: 1px solid var(--border); }
+.reason__title { font-weight: 600; color: var(--text-strong); }
+.holding[open] > summary { border-bottom: 1px solid var(--border); }
+.laws--cols, .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.laws--cols .law, .group { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.group > summary { justify-content: flex-start; }
+.group__name { flex: 1; font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.checks { list-style: none; margin: 0; padding: 0 1.125rem 0.75rem 2rem; }
+.checks li { padding: 0.125rem 0; font-family: var(--font-mono); font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
 .machine__head { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; justify-content: space-between; padding: 1rem 1.125rem; border-bottom: 1px solid var(--border); }
 .machine__title { min-width: 0; }
 .machine__title h2 { font-size: 15px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
