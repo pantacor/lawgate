@@ -213,8 +213,8 @@ func TestHTMLPutsWhatNeedsAttentionFirst(t *testing.T) {
 	if attention < 0 || attention > machines {
 		t.Fatalf("Needs attention must come before the machines")
 	}
-	if !strings.Contains(text, `<details class="holding">`) {
-		t.Fatalf("laws that hold must be folded")
+	if !strings.Contains(text, `<details class="mrow" data-verdict="ok"`) || strings.Contains(text, `data-verdict="ok" data-name="good" open`) {
+		t.Fatalf("a machine whose laws hold must be a closed row")
 	}
 }
 

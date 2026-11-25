@@ -52,21 +52,15 @@ const htmlPage = `<!doctype html>
 		<p>{{.Headline}}</p>
 	</div>
 
-	<div class="toolbar">
-		<label class="search">
-			<span class="visually-hidden">Filter machines or laws</span>
-			<input id="filter" class="form-control" type="search" placeholder="Filter machines or laws…" autocomplete="off">
-		</label>
-		<div class="filters" role="group" aria-label="Show">
-			<button class="chip is-active" type="button" data-show="all" aria-pressed="true">All</button>
-			<button class="chip" type="button" data-show="broken" aria-pressed="false">Broken</button>
-			<button class="chip" type="button" data-show="pending" aria-pressed="false">Pending</button>
-		</div>
-	</div>
+	<nav class="tabs" role="tablist" aria-label="Report sections">
+		{{if .Attention}}<button class="tab" type="button" role="tab" data-tab="attention">Needs attention <span class="tab__count tab__count--{{if .Broken}}danger{{else}}info{{end}}">{{len .Attention}}</span></button>{{end}}
+		{{if .MachineCards}}<button class="tab" type="button" role="tab" data-tab="machines">Machines <span class="tab__count">{{len .MachineCards}}</span></button>{{end}}
+		{{if .Gates}}<button class="tab" type="button" role="tab" data-tab="gates">Gate checks <span class="tab__count">{{.GateCount}}</span></button>{{end}}
+	</nav>
 
 	{{if .Attention}}
-	<section class="section" id="attention" aria-label="Needs attention">
-		<h2 class="section__title">Needs attention <span class="count">{{len .Attention}}</span></h2>
+	<section class="panel" id="attention-panel" data-panel="attention" role="tabpanel" aria-label="Needs attention">
+		<p class="panel__lead">Every law or check that is broken or pending, grouped by why.</p>
 		<div class="card attention">
 		{{range .Reasons}}
 			<details class="reason reason--{{.Tone}}"{{if .Open}} open{{end}}>
@@ -90,23 +84,39 @@ const htmlPage = `<!doctype html>
 	{{end}}
 
 	{{if .MachineCards}}
-	<section class="section" aria-label="Machines">
-		<h2 class="section__title">Machines <span class="count">{{len .MachineCards}}</span></h2>
-		<main class="grid" id="machines">
+	<section class="panel" id="machines-panel" data-panel="machines" role="tabpanel" aria-label="Machines">
+		<div class="toolbar">
+		<label class="search">
+			<span class="visually-hidden">Filter machines or laws</span>
+			<input id="filter" class="form-control" type="search" placeholder="Filter machines or laws…" autocomplete="off">
+		</label>
+		<div class="filters" role="group" aria-label="Show">
+			<button class="chip is-active" type="button" data-show="all" aria-pressed="true">All</button>
+			<button class="chip" type="button" data-show="broken" aria-pressed="false">Broken</button>
+			<button class="chip" type="button" data-show="pending" aria-pressed="false">Pending</button>
+		</div>
+	</div>
+		<div class="card mlist" id="machines">
 		{{range .MachineCards}}
-			<article class="card machine" data-verdict="{{template "verdict" .}}" data-name="{{.Name}}">
-				{{template "head" .}}
-				{{if .Attention}}<ul class="laws">{{range .Attention}}{{template "law" .}}{{end}}</ul>{{end}}
-				{{if .Holding}}<details class="holding"><summary>{{len .Holding}} {{if eq (len .Holding) 1}}law holds{{else}}laws hold{{end}}</summary><ul class="laws">{{range .Holding}}{{template "law" .}}{{end}}</ul></details>{{end}}
-			</article>
+			<details class="mrow" data-verdict="{{template "verdict" .}}" data-name="{{.Name}}"{{if or .Failure .Broken}} open{{end}}>
+				<summary class="mrow__head">
+					<span class="mrow__name">{{.Name}}</span>
+					{{if .Source}}<code class="mrow__source">{{.Source}}</code>{{end}}
+					<span class="count">{{.Count}} {{if eq .Count 1}}law{{else}}laws{{end}}</span>
+					<span class="status-pill status-pill--{{.Tone}}">{{.Verdict}}</span>
+				</summary>
+				{{if .Failure}}<p class="machine__failure">Could not be checked: {{.Failure}}</p>{{end}}
+				<ul class="laws">{{range .Attention}}{{template "law" .}}{{end}}{{range .Holding}}{{template "law" .}}{{end}}</ul>
+			</details>
 		{{end}}
-		</main>
+		</div>
+		<p class="empty" id="empty" hidden>No machine or law matches the filter.</p>
 	</section>
 	{{end}}
 
 	{{if .Gates}}
-	<section class="section" id="gates" aria-label="Gate checks">
-		<h2 class="section__title">Gate checks</h2>
+	<section class="panel" id="gates-panel" data-panel="gates" role="tabpanel" aria-label="Gate checks">
+		<p class="panel__lead">Tests, documentation and repository checks the gate ran, by package.</p>
 		<div class="toolbar">
 			<label class="search">
 				<span class="visually-hidden">Filter gate checks</span>
@@ -153,7 +163,6 @@ const htmlPage = `<!doctype html>
 	</section>
 	{{end}}
 
-	<p class="empty" id="empty" hidden>No machine or law matches the filter.</p>
 
 	<footer class="footer">
 		{{if .Reproduce}}<span>Run <code>{{.Reproduce}}</code> to reproduce this page.</span>{{end}}
@@ -190,13 +199,32 @@ const htmlPage = `<!doctype html>
 			var ok = (show === "all" || verdict === show) && (!q || text.indexOf(q) !== -1);
 			card.hidden = !ok;
 			if (ok) { visible++; }
-			card.querySelectorAll("details").forEach(function (part) {
-				part.open = !!q && part.textContent.toLowerCase().indexOf(q) !== -1;
-			});
+			if (q) { card.open = ok; }
 		});
 		empty.hidden = visible !== 0;
 	}
 	input.addEventListener("input", apply);
+
+	// Tabs: one section at a time. The hash names it, so links, reloads and
+	// the back button keep it; Needs attention opens first when there is any.
+	var tabs = document.querySelectorAll("[data-tab]");
+	var panels = document.querySelectorAll("[data-panel]");
+	function showTab(name) {
+		var known = false;
+		tabs.forEach(function (tab) { if (tab.getAttribute("data-tab") === name) { known = true; } });
+		if (!known && tabs.length) { name = tabs[0].getAttribute("data-tab"); }
+		tabs.forEach(function (tab) {
+			var on = tab.getAttribute("data-tab") === name;
+			tab.classList.toggle("is-active", on);
+			tab.setAttribute("aria-selected", on ? "true" : "false");
+		});
+		panels.forEach(function (panel) { panel.hidden = panel.getAttribute("data-panel") !== name; });
+	}
+	tabs.forEach(function (tab) {
+		tab.addEventListener("click", function () { location.hash = tab.getAttribute("data-tab"); });
+	});
+	window.addEventListener("hashchange", function () { showTab(location.hash.slice(1)); });
+	showTab(location.hash.slice(1));
 
 	// Gate checks have their own filter: it shows single checks, hides the
 	// packages left empty and opens the ones that match.
@@ -456,6 +484,28 @@ h1, h2 { margin: 0; }
 .machine { display: flex; flex-direction: column; overflow: hidden; }
 .machine--wide { overflow: hidden; }
 .section { margin-top: 1.75rem; }
+.tabs { display: flex; gap: 1.5rem; margin: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab { display: inline-flex; gap: 0.5rem; align-items: center; padding: 0.625rem 0.125rem; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--text-strong); }
+.tab.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.tab__count { padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 12px; background: var(--surface-tertiary); color: var(--text); }
+.tab__count--danger { background: var(--badge-danger-bg); color: var(--badge-danger-fg); }
+.tab__count--info { background: var(--badge-info-bg); color: var(--badge-info-fg); }
+.panel__lead { margin: 0 0 0.75rem; font-size: 13px; color: var(--text-muted); }
+.panel .toolbar { margin-bottom: 0.75rem; }
+.mlist { overflow: hidden; }
+.mrow { border-bottom: 1px solid var(--border); }
+.mrow:last-child { border-bottom: 0; }
+.mrow__head { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto auto; gap: 0.75rem; align-items: center; padding: 0.625rem 1.125rem; cursor: pointer; list-style: none; }
+.mrow__head::-webkit-details-marker { display: none; }
+.mrow__name { font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.mrow__name::before { content: "\25B8"; display: inline-block; margin-right: 0.5rem; color: var(--text-muted); transition: transform 0.15s; }
+.mrow[open] .mrow__name::before { transform: rotate(90deg); }
+.mrow__source { justify-self: start; overflow-wrap: anywhere; }
+.mrow[open] > .mrow__head { border-bottom: 1px solid var(--border); }
+.mrow .laws { padding-left: 1rem; }
+@media (max-width: 720px) { .mrow__head { grid-template-columns: 1fr auto; } .mrow__source { grid-column: 1 / -1; } .mrow__head .count { display: none; } }
 .section__title { display: flex; gap: 0.5rem; align-items: baseline; margin: 0 0 0.75rem; font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .attention { list-style: none; margin: 0; padding: 0; overflow: hidden; }
 .law__where { margin: 0; flex-shrink: 0; max-width: 45%; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }

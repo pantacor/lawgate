@@ -7,6 +7,17 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-25
+
+### Changed
+
+- `report`: the page is three tabs under the summary, each its own view:
+  **Needs attention** (opens first when there is any), **Machines** and
+  **Gate checks**, with counts on the tabs. The URL hash keeps the tab.
+- `report`: machines are one row each (name, source, law count, verdict),
+  folded; a row with a broken law starts open. The filter opens the rows
+  that match.
+
 ## [0.1.3] - 2026-11-25
 
 ### Changed

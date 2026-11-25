@@ -72,6 +72,7 @@ type HTMLData struct {
 	Reasons      []htmlReason    // the same items, by reason
 	MachineCards []htmlMachine   // machine cards, worst first
 	Gates        []htmlMachine   // gate check cards
+	GateCount    int             // gate checks over every gate card
 }
 
 // pageVerdict is how the page states an outcome.
@@ -121,6 +122,7 @@ func NewHTMLData(runs []LawRun, meta Meta) HTMLData {
 		data.Attention = append(data.Attention, attentionOf(card)...)
 		if card.GateChecks {
 			data.Gates = append(data.Gates, card)
+			data.GateCount += card.Count
 			continue
 		}
 		data.MachineCards = append(data.MachineCards, card)
