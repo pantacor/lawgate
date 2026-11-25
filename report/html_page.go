@@ -105,23 +105,51 @@ const htmlPage = `<!doctype html>
 	{{end}}
 
 	{{if .Gates}}
-	<section class="section" aria-label="Gate checks">
+	<section class="section" id="gates" aria-label="Gate checks">
 		<h2 class="section__title">Gate checks</h2>
+		<div class="toolbar">
+			<label class="search">
+				<span class="visually-hidden">Filter gate checks</span>
+				<input id="gate-filter" class="form-control" type="search" placeholder="Filter gate checks or packages…" autocomplete="off">
+			</label>
+			<div class="filters" role="group" aria-label="Show gate checks">
+				<button class="chip is-active" type="button" data-gate-show="all" aria-pressed="true">All</button>
+				<button class="chip" type="button" data-gate-show="broken" aria-pressed="false">Broken</button>
+				<button class="chip" type="button" data-gate-show="pending" aria-pressed="false">Pending</button>
+				<button class="chip" type="button" data-gate-show="holds" aria-pressed="false">Holds</button>
+			</div>
+		</div>
 		{{range .Gates}}
-			<article class="card machine machine--wide" data-verdict="{{template "verdict" .}}" data-name="{{.Name}}">
+			<article class="card machine machine--wide" data-name="{{.Name}}">
 				{{template "head" .}}
 				{{if .Prefix}}<p class="machine__prefix">Names drop the shared prefix <code>{{.Prefix}}</code></p>{{end}}
-				{{if .Attention}}<p class="machine__prefix"><a href="#attention">{{len .Attention}} {{if eq (len .Attention) 1}}check needs{{else}}checks need{{end}} attention</a>, listed at the top of the page.</p>{{end}}
 				{{if .Groups}}<div class="groups">
 				{{range .Groups}}
-					<details class="group">
-						<summary><span class="group__name">{{.Name}}</span><span class="count">{{len .Checks}} hold</span></summary>
-						<ul class="checks">{{range .Checks}}<li>{{.Name}}</li>{{end}}</ul>
+					<details class="group" data-group{{if .Open}} data-open open{{end}}>
+						<summary>
+							<span class="group__name">{{.Name}}</span>
+							{{if .Broken}}<span class="status-pill status-pill--danger">{{.Broken}} broken</span>{{end}}
+							{{if .Pending}}<span class="status-pill status-pill--info">{{.Pending}} pending</span>{{end}}
+							{{if .Holds}}<span class="count">{{.Holds}} hold</span>{{end}}
+						</summary>
+						<ul class="checks">
+						{{range .Checks}}
+							<li class="check" data-state="{{lower .State}}">
+								<div class="check__row">
+									<span class="check__name">{{.Name}}</span>
+									{{if ne .State "Holds"}}<span class="status-pill status-pill--{{.Tone}}">{{.State}}</span>{{end}}
+								</div>
+								{{if .Pending}}<p class="law__doc">{{.Pending}}</p>{{end}}
+								{{if .Violations}}<pre class="violations">{{join .Violations "\n"}}</pre>{{end}}
+							</li>
+						{{end}}
+						</ul>
 					</details>
 				{{end}}
 				</div>{{end}}
 			</article>
 		{{end}}
+		<p class="empty" id="gate-empty" hidden>No gate check matches the filter.</p>
 	</section>
 	{{end}}
 
@@ -169,6 +197,48 @@ const htmlPage = `<!doctype html>
 		empty.hidden = visible !== 0;
 	}
 	input.addEventListener("input", apply);
+
+	// Gate checks have their own filter: it shows single checks, hides the
+	// packages left empty and opens the ones that match.
+	var gateInput = document.getElementById("gate-filter");
+	var gateChips = document.querySelectorAll("[data-gate-show]");
+	var gateGroups = document.querySelectorAll("[data-group]");
+	var gateEmpty = document.getElementById("gate-empty");
+	var gateShow = "all";
+	function applyGates() {
+		var q = gateInput.value.trim().toLowerCase();
+		var filtering = !!q || gateShow !== "all";
+		var total = 0;
+		gateGroups.forEach(function (group) {
+			var name = group.querySelector(".group__name").textContent.toLowerCase();
+			var whole = !!q && name.indexOf(q) !== -1;
+			var shown = 0;
+			group.querySelectorAll("[data-state]").forEach(function (check) {
+				var state = gateShow === "all" || check.getAttribute("data-state") === gateShow;
+				var text = !q || whole || check.textContent.toLowerCase().indexOf(q) !== -1;
+				check.hidden = !(state && text);
+				if (!check.hidden) { shown++; }
+			});
+			group.hidden = shown === 0;
+			group.open = filtering ? shown > 0 : group.hasAttribute("data-open");
+			total += shown;
+		});
+		if (gateEmpty) { gateEmpty.hidden = total !== 0; }
+	}
+	if (gateInput) {
+		gateInput.addEventListener("input", applyGates);
+		gateChips.forEach(function (chip) {
+			chip.addEventListener("click", function () {
+				gateShow = chip.getAttribute("data-gate-show");
+				gateChips.forEach(function (c) {
+					var on = c === chip;
+					c.classList.toggle("is-active", on);
+					c.setAttribute("aria-pressed", on ? "true" : "false");
+				});
+				applyGates();
+			});
+		});
+	}
 	chips.forEach(function (chip) {
 		chip.addEventListener("click", function () {
 			show = chip.getAttribute("data-show");
@@ -405,7 +475,12 @@ h1, h2 { margin: 0; }
 .group > summary { justify-content: flex-start; }
 .group__name { flex: 1; font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
 .checks { list-style: none; margin: 0; padding: 0 1.125rem 0.75rem 2rem; }
-.checks li { padding: 0.125rem 0; font-family: var(--font-mono); font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
+.check { padding: 0.125rem 0; }
+.check__row { display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; }
+.check__name { font-family: var(--font-mono); font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
+.check .violations { font-size: 11px; }
+.group .status-pill { flex-shrink: 0; }
+#gates .toolbar { margin-bottom: 0.75rem; }
 .machine__head { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; justify-content: space-between; padding: 1rem 1.125rem; border-bottom: 1px solid var(--border); }
 .machine__title { min-width: 0; }
 .machine__title h2 { font-size: 15px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }

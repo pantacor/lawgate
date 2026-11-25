@@ -24,8 +24,27 @@ type htmlAttention struct {
 
 // htmlGroup is a set of gate checks that share a package.
 type htmlGroup struct {
-	Name   string
-	Checks []htmlLaw
+	Name    string
+	Checks  []htmlLaw
+	Holds   int
+	Broken  int
+	Pending int
+	Open    bool // a group with something broken or pending starts open
+}
+
+// count tallies the group's checks by state.
+func (g *htmlGroup) count() {
+	for _, check := range g.Checks {
+		switch check.State {
+		case "Broken":
+			g.Broken++
+		case "Pending":
+			g.Pending++
+		default:
+			g.Holds++
+		}
+	}
+	g.Open = g.Broken > 0
 }
 
 // splitLaws parts a card's laws into those that need attention and those
@@ -139,7 +158,7 @@ func severity(tone string) int {
 }
 
 // groupChecks cuts the prefix every check name shares and groups the
-// checks that hold by package. It returns the prefix it cut.
+// checks by package. It returns the prefix it cut.
 func groupChecks(checks []htmlLaw) (string, []htmlGroup) {
 	prefix := sharedPrefix(checks)
 	byName := map[string]*htmlGroup{}
@@ -157,7 +176,9 @@ func groupChecks(checks []htmlLaw) (string, []htmlGroup) {
 	sort.Strings(order)
 	groups := make([]htmlGroup, 0, len(order))
 	for _, name := range order {
-		groups = append(groups, *byName[name])
+		group := *byName[name]
+		group.count()
+		groups = append(groups, group)
 	}
 	return prefix, groups
 }

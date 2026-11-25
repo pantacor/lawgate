@@ -153,7 +153,7 @@ func htmlCard(run LawRun) htmlMachine {
 	}
 	card.Attention, card.Holding = splitLaws(card.Laws)
 	if card.GateChecks {
-		card.Prefix, card.Groups = groupChecks(card.Holding)
+		card.Prefix, card.Groups = groupChecks(card.Laws)
 		card.Attention = trimPrefix(card.Prefix, card.Attention)
 	}
 	return card
@@ -202,5 +202,6 @@ func WriteHTML(path string, data HTMLData) error {
 }
 
 var htmlTemplate = template.Must(template.New("laws").Funcs(template.FuncMap{
-	"join": strings.Join,
+	"join":  strings.Join,
+	"lower": strings.ToLower,
 }).Parse(strings.Replace(htmlPage, "/*css*/", htmlCSS, 1)))

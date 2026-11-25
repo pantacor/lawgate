@@ -7,6 +7,16 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-25
+
+### Changed
+
+- `report`: the gate checks have their own filter, a search box and the
+  All, Broken, Pending and Holds chips. It filters single checks, hides the
+  packages it leaves empty and opens the ones that match. Every check is in
+  its package, with the package's broken, pending and holding counts on its
+  line; a package with a broken check starts open.
+
 ## [0.1.2] - 2026-11-25
 
 The HTML report listed every law and gate check at full length: Fleet's
