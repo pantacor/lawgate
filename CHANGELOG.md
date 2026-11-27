@@ -7,6 +7,16 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+### Added
+
+- `check` says what it is doing while it runs: one line per step on stderr
+  (the machine inventory, each module's machines, tests and laws, each law's
+  bite as `bite N/M`, the repository checks and the proof lock), each with
+  the time since the check began and how long the step took, and a closing
+  line with the passed, failed and pending counts. stdout still carries only
+  the report directory, so `report=$(lawgate check)` keeps working and a CI
+  log is no longer silent for the length of the gate.
+
 ## [0.1.4] - 2026-11-25
 
 ### Changed

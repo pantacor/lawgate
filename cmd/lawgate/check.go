@@ -75,6 +75,8 @@ func checkCommand(arguments []string, output io.Writer) error {
 		return err
 	}
 	fmt.Fprintln(output, directory)
+	progress.begin(progressOutput)
+	progress.step("checking %s; reports in %s", absoluteRoot, directory)
 	return check(absoluteRoot, directory, *base)
 }
 
@@ -86,27 +88,43 @@ func check(root, directory, base string) error {
 		result.recordError(inventory.Filename, err)
 		return errors.Join(err, writeReports(directory, meta, []moduleResult{result}, nil))
 	}
+	progress.step("%d module(s) in %s", len(config.Modules), inventory.Filename)
 	results := make([]moduleResult, len(config.Modules))
 	for index, module := range config.Modules {
 		results[index] = prepareModule(root, module)
 	}
+	done := progress.timed("machine inventory and generated files")
 	goModules, moduleErr := inventory.GoModules(root)
 	machineProblems := checkMachineInventory(root, config, results, goModules, moduleErr)
 	generationProblems := checkGeneration(root, config, results, goModules)
+	done()
 	meta.Product = config.Product
 	reportErrors := runModulePhases(root, directory, config, results, meta)
+	done = progress.timed("repository checks")
 	repo, notes := checkRepository(root, config)
 	recordRepositoryProblems(&repo, "machine inventory", machineProblems)
 	recordRepositoryProblems(&repo, freshnessLaw, generationProblems)
+	done()
+	done = progress.timed("proof lock%s", replayLabel(base))
 	checkAnchoredProofs(root, base, config, &repo)
+	done()
 	if len(repo.Verdicts) > 0 {
 		results = append(results, repo)
 	}
 	reportErrors = errors.Join(reportErrors, writeReports(directory, meta, results, notes))
+	failures, pendings, passes := verdictCounts(results)
+	progress.step("finished: %d passed, %d failed, %d pending", passes, failures, pendings)
 	if slices.ContainsFunc(results, moduleFailed) {
 		return errors.Join(reportErrors, fmt.Errorf("law checks failed; see %s", directory))
 	}
 	return reportErrors
+}
+
+func replayLabel(base string) string {
+	if base == "" {
+		return ""
+	}
+	return " (replaying the proofs of " + base + ")"
 }
 
 func recordRepositoryProblems(result *moduleResult, name string, problems []string) {
@@ -118,16 +136,22 @@ func recordRepositoryProblems(result *moduleResult, name string, problems []stri
 func runModulePhases(root, directory string, config inventory.Config, results []moduleResult, meta report.Meta) error {
 	reportErrors := writeReports(directory, meta, results, nil)
 	for index, module := range config.Modules {
+		done := progress.timed("machines of %s", moduleLabel(module.Path))
 		checkMachines(root, directory, index, module, &results[index])
+		done()
 	}
 	reportErrors = errors.Join(reportErrors, writeReports(directory, meta, results, nil))
 	for index, module := range config.Modules {
+		done := progress.timed("tests of %s", moduleLabel(module.Path))
 		checkTests(root, module, &results[index])
+		done()
 	}
 	reportErrors = errors.Join(reportErrors, writeReports(directory, meta, results, nil))
 	for index, module := range config.Modules {
+		done := progress.timed("laws and bites of %s", moduleLabel(module.Path))
 		checkLawsDoc(root, module, &results[index])
 		checkBites(root, module, &results[index])
+		done()
 	}
 	return errors.Join(reportErrors, writeReports(directory, meta, results, nil))
 }
