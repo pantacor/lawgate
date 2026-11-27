@@ -7,6 +7,8 @@ version may change the API; the entry says how to migrate.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-27
+
 ### Added
 
 - `check` says what it is doing while it runs: one line per step on stderr
