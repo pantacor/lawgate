@@ -29,6 +29,7 @@ type bitePhase struct {
 	result  *moduleResult
 	goTests func() (*goBiteInputs, error)
 	cache   mutate.Cache
+	counter *biteCounter
 }
 
 // mutationCache is where passing mutation runs are remembered.
@@ -38,12 +39,46 @@ func checkBites(root string, module inventory.Module, result *moduleResult) {
 	if !result.Ready {
 		return
 	}
-	phase := bitePhase{root: root, module: module, result: result, cache: mutationCache()}
+	primary := lawDocument{Path: module.Laws, Plans: result.Plans}
+	docs := append([]lawDocument{primary}, result.SharedDocs...)
+	counter := &biteCounter{total: agreedLaws(docs)}
+	phase := bitePhase{root: root, module: module, result: result, cache: mutationCache(), counter: counter}
 	phase.goTests = syncGoBiteInputs(root, module, result)
-	phase.checkDocument(lawDocument{Path: module.Laws, Plans: result.Plans})
-	for _, doc := range result.SharedDocs {
+	for _, doc := range docs {
 		phase.checkDocument(doc)
 	}
+}
+
+// biteCounter numbers the laws a module's bite phase checks, for progress.
+type biteCounter struct {
+	done, total int
+}
+
+// next reports the start of the next law's bite and returns its end.
+func (counter *biteCounter) next(law string) func() {
+	if counter == nil {
+		return func() {}
+	}
+	counter.done++
+	return progress.timed("bite %d/%d: %s", counter.done, counter.total, law)
+}
+
+func agreedLaws(docs []lawDocument) int {
+	count := 0
+	for _, doc := range docs {
+		count += agreedPlans(doc.Plans)
+	}
+	return count
+}
+
+func agreedPlans(plans []lawsdoc.LawPlan) int {
+	count := 0
+	for _, law := range plans {
+		if law.Agreed() {
+			count++
+		}
+	}
+	return count
 }
 
 // syncGoBiteInputs discovers tests once, only if an enforcer needs them.
@@ -86,7 +121,9 @@ func discoverGoBiteInputs(dir string, command []string, timeout time.Duration) (
 func (phase bitePhase) checkDocument(doc lawDocument) {
 	for _, law := range doc.Plans {
 		if law.Agreed() {
+			done := phase.counter.next(law.Name)
 			phase.checkLaw(doc.Path, law)
+			done()
 		}
 	}
 }

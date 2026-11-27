@@ -50,6 +50,7 @@
         "cmd/lawgate/owner_notes_test.go",
         "cmd/lawgate/owners_test.go",
         "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/progress_test.go",
         "cmd/lawgate/vendor_owners_test.go",
         "gen/check_test.go",
         "gen/gen_test.go"
@@ -116,6 +117,7 @@
         "cmd/lawgate/owner_notes_test.go",
         "cmd/lawgate/owners_test.go",
         "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/progress_test.go",
         "cmd/lawgate/vendor_owners_test.go",
         "machine/graph_test.go",
         "machine/helpers_test.go",
@@ -363,6 +365,7 @@
         "cmd/lawgate/owner_notes_test.go",
         "cmd/lawgate/owners_test.go",
         "cmd/lawgate/phases_test.go",
+        "cmd/lawgate/progress_test.go",
         "cmd/lawgate/vendor_owners_test.go",
         "rulechanges/audit_range_test.go",
         "rulechanges/closure_test.go",
